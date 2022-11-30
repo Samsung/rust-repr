@@ -1,6 +1,6 @@
 //! Various macro utilities.
 
-use super::err;
+use super::ReprDeriveError;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse::Parser, spanned::Spanned, visit_mut::VisitMut, DataEnum, DeriveInput, Fields};
@@ -38,7 +38,7 @@ pub fn enum_should_have_all_discriminants(e: &DataEnum) -> syn::Result<()> {
         if v.discriminant.is_none() {
             return Err(syn::Error::new(
                 v.span(),
-                err::FIELDLESS_ENUM_NEEDS_ALL_VALUES,
+                ReprDeriveError::FieldlessEnumNeedsAllValues,
             ));
         }
     }
@@ -48,7 +48,7 @@ pub fn enum_should_have_all_discriminants(e: &DataEnum) -> syn::Result<()> {
 pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
     for v in e.variants.iter() {
         if v.discriminant.is_some() {
-            return Err(syn::Error::new(v.span(), err::FIELD_ENUM_CANNOT_SET_VALUES));
+            return Err(syn::Error::new(v.span(), ReprDeriveError::FieldEnumCannotSetValues));
         }
     }
     Ok(())

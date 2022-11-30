@@ -1,4 +1,4 @@
-use super::err;
+use super::ReprDeriveError;
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_body, ident_with_generics,
@@ -54,7 +54,7 @@ pub fn repr_impl_for_struct(
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
     if !info.is_c {
-        return Err(syn::Error::new(def.span(), err::STRUCT_NEEDS_REPR_C));
+        return Err(syn::Error::new(def.span(), ReprDeriveError::StructNeedsReprC));
     }
 
     let repr_struct = repr_struct(def, e);

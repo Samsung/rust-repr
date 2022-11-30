@@ -1,6 +1,6 @@
 //! Tools for extracting repr(C) info from struct and enum declarations.
 
-use super::err;
+use super::ReprDeriveError;
 use syn::spanned::Spanned;
 use syn::{Attribute, DeriveInput, Lit, LitInt, Meta, MetaList, NestedMeta};
 
@@ -25,7 +25,8 @@ impl ReprInfo {
 
     pub fn set_primitive(&mut self, p: syn::Path) -> syn::Result<()> {
         if self.primitive.is_some() {
-            return Err(syn::Error::new(p.span(), err::MULT_PRIM));
+            return Err(syn::Error::new(p.span(), ReprDeriveError::MultiplePrimitives));
+
         }
         self.primitive = Some(p);
         Ok(())
@@ -33,7 +34,7 @@ impl ReprInfo {
 
     pub fn set_align(&mut self, a: &LitInt) -> syn::Result<()> {
         if self.align.is_some() {
-            return Err(syn::Error::new(a.span(), err::MULT_ALIGN));
+            return Err(syn::Error::new(a.span(), ReprDeriveError::MultipleAlign));
         }
         self.align = Some(a.clone());
         Ok(())
@@ -41,7 +42,7 @@ impl ReprInfo {
 
     pub fn set_packed(&mut self, a: &LitInt) -> syn::Result<()> {
         if self.packed.is_some() {
-            return Err(syn::Error::new(a.span(), err::MULT_PACKED));
+            return Err(syn::Error::new(a.span(), ReprDeriveError::MultiplePacked));
         }
         self.packed = Some(a.clone());
         Ok(())
@@ -50,7 +51,7 @@ impl ReprInfo {
     pub fn get_enum_primitive(&self) -> syn::Result<&syn::Path> {
         self.primitive
             .as_ref()
-            .ok_or_else(|| syn::Error::new(self.span, err::NO_PRIM_FOR_ENUM))
+            .ok_or_else(|| syn::Error::new(self.span, ReprDeriveError::NoPrimForEnum))
     }
 }
 
@@ -87,7 +88,7 @@ fn extract_repr_info(l: &MetaList, info: &mut ReprInfo) -> syn::Result<()> {
                 } else if is_primitive(p) {
                     info.set_primitive(p.clone())?;
                 } else {
-                    return Err(syn::Error::new(item.span(), err::UNEXPECTED_REPR));
+                    return Err(syn::Error::new(item.span(), ReprDeriveError::UnexpectedRepr));
                 }
             }
             NestedMeta::Meta(Meta::List(l)) => {
@@ -102,10 +103,10 @@ fn extract_repr_info(l: &MetaList, info: &mut ReprInfo) -> syn::Result<()> {
                             info.set_align(i)?;
                         }
                     }
-                    _ => return Err(syn::Error::new(item.span(), err::INVALID_PACKED_ALIGN)),
+                    _ => return Err(syn::Error::new(item.span(), ReprDeriveError::InvalidPackedAlign)),
                 }
             }
-            _ => return Err(syn::Error::new(item.span(), err::UNEXPECTED_REPR)),
+            _ => return Err(syn::Error::new(item.span(), ReprDeriveError::UnexpectedRepr)),
         }
     }
     Ok(())

@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use self::repr_enum::repr_impl_for_enum;
 use self::repr_struct::repr_impl_for_struct;
 use self::repr_type::get_repr_type;
@@ -10,23 +11,47 @@ pub(crate) mod repr_struct;
 pub(crate) mod repr_type;
 pub(crate) mod repr_util;
 
+#[derive(PartialEq, Eq)]
+enum ReprDeriveError {
+    MultiplePrimitives,
+    MultipleAlign,
+    MultiplePacked,
+    InvalidPackedAlign,
+    UnexpectedRepr,
+    NoPrimForEnum,
+    EnumIsEmpty,
+    FieldlessEnumNeedsAllValues,
+    FieldEnumCannotSetValues,
+    PackedNotSupported,
+    AlignNotSupported,
+    NonLifetimeGenericsNotSupported,
+    StructNeedsReprC,
+    NoReprForUnion,
+}
+
+impl Display for ReprDeriveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            Self::MultiplePrimitives => "Multiple primitives in repr",
+            Self::MultipleAlign => "Multiple align() in repr",
+            Self::MultiplePacked => "Multiple packed() in repr",
+            Self::InvalidPackedAlign => "Unexpected packed/align contents",
+            Self::UnexpectedRepr => "Unexpected repr item",
+            Self::NoPrimForEnum => "Enum does not specify a fixed repr type",
+            Self::EnumIsEmpty => "Enum cannot be empty",
+            Self::FieldlessEnumNeedsAllValues => "Fieldless enum should specify values for all variants",
+            Self::FieldEnumCannotSetValues => "Enum with fields cannot specify values for variants",
+            Self::PackedNotSupported => "Packed structs are not supported yet",
+            Self::AlignNotSupported => "Aligned structs/enums are not supported yet",
+            Self::NonLifetimeGenericsNotSupported => "Non-lifetime generics are not supported",
+            Self::StructNeedsReprC => "Repr for structs needs repr(C)",
+            Self::NoReprForUnion => "Repr can't be derived for unions",
+        };
+        write!(f, "{}", msg)
+    }
+}
+
 pub(crate) mod err {
-    pub const MULT_PRIM: &str = "Multiple primitives in repr";
-    pub const MULT_ALIGN: &str = "Multiple align() in repr";
-    pub const MULT_PACKED: &str = "Multiple packed() in repr";
-    pub const INVALID_PACKED_ALIGN: &str = "Unexpected packed/align contents";
-    pub const UNEXPECTED_REPR: &str = "Unexpected repr item";
-    pub const NO_PRIM_FOR_ENUM: &str = "Enum does not specify a fixed repr type";
-    pub const ENUM_IS_EMPTY: &str = "Enum cannot be empty";
-    pub const FIELDLESS_ENUM_NEEDS_ALL_VALUES: &str =
-        "Fieldless enum should specify values for all variants";
-    pub const FIELD_ENUM_CANNOT_SET_VALUES: &str =
-        "Enum with fields cannot specify values for variants";
-    pub const PACKED_NOT_SUPPORTED: &str = "Packed structs are not supported yet";
-    pub const ALIGN_NOT_SUPPORTED: &str = "Aligned structs/enums are not supported yet";
-    pub const NON_LIFETIME_GENERICS_NOT_SUPPORTED: &str = "Non-lifetime generics are not supported";
-    pub const STRUCT_NEEDS_REPR_C: &str = "Repr for structs needs repr(C)";
-    pub const NO_REPR_FOR_UNION: &str = "Repr can't be derived for unions";
 }
 
 pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
@@ -34,23 +59,24 @@ pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
     if def_has_non_lifetime_generics(&d) {
         return Err(syn::Error::new(
             d.span(),
-            err::NON_LIFETIME_GENERICS_NOT_SUPPORTED,
+            ReprDeriveError::NonLifetimeGenericsNotSupported
         ));
     }
 
     let info = get_repr_type(&d)?;
 
     if info.packed.is_some() {
-        return Err(syn::Error::new(d.span(), err::PACKED_NOT_SUPPORTED));
+        return Err(syn::Error::new(d.span(),
+        ReprDeriveError::PackedNotSupported));
     }
     if info.align.is_some() {
-        return Err(syn::Error::new(d.span(), err::ALIGN_NOT_SUPPORTED));
+        return Err(syn::Error::new(d.span(), ReprDeriveError::AlignNotSupported));
     }
 
     match &d.data {
         syn::Data::Enum(e) => repr_impl_for_enum(&d, e, &info),
         syn::Data::Struct(s) => repr_impl_for_struct(&d, s, &info),
-        _ => Err(syn::Error::new(d.span(), err::NO_REPR_FOR_UNION)),
+        _ => Err(syn::Error::new(d.span(), ReprDeriveError::NoReprForUnion)),
     }
 }
 
@@ -59,8 +85,9 @@ mod test {
     use super::*;
     use quote::quote;
 
-    fn has_err<T: core::fmt::Debug>(e: syn::Result<T>, s: &'static str) -> bool {
-        format!("{}", e.unwrap_err()).contains(s)
+    fn has_err<T: core::fmt::Debug>(e: syn::Result<T>, s: ReprDeriveError) -> bool {
+        // The best we can do with syn::Error.
+        e.unwrap_err().to_string() == s.to_string()
     }
 
     #[test]
@@ -70,7 +97,7 @@ mod test {
                 BAR = 5,
             }
         };
-        assert!(has_err(do_derive(s), err::NO_PRIM_FOR_ENUM));
+        assert!(has_err(do_derive(s), ReprDeriveError::NoPrimForEnum));
     }
 
     #[test]
@@ -91,7 +118,7 @@ mod test {
             #[repr(transparent)]
             struct Foo;
         };
-        assert!(has_err(do_derive(s), err::UNEXPECTED_REPR));
+        assert!(has_err(do_derive(s), ReprDeriveError::UnexpectedRepr));
     }
 
     #[test]
@@ -103,7 +130,7 @@ mod test {
                 BAR = 0,
             }
         };
-        assert!(has_err(do_derive(s), err::MULT_PRIM));
+        assert!(has_err(do_derive(s), ReprDeriveError::MultiplePrimitives));
     }
 
     #[test]
@@ -112,7 +139,7 @@ mod test {
             #[repr(C, align(4), align(16))]
             struct Foo;
         };
-        assert!(has_err(do_derive(s), err::MULT_ALIGN));
+        assert!(has_err(do_derive(s), ReprDeriveError::MultipleAlign));
     }
 
     #[test]
@@ -121,7 +148,7 @@ mod test {
             #[repr(C, packed, packed(2))]
             struct Foo;
         };
-        assert!(has_err(do_derive(s), err::MULT_PACKED));
+        assert!(has_err(do_derive(s), ReprDeriveError::MultiplePacked));
     }
 
     #[test]
@@ -130,7 +157,7 @@ mod test {
             #[repr(C, packed("a"))]
             struct Foo;
         };
-        assert!(has_err(do_derive(s), err::INVALID_PACKED_ALIGN));
+        assert!(has_err(do_derive(s), ReprDeriveError::InvalidPackedAlign));
     }
 
     #[test]
@@ -140,7 +167,7 @@ mod test {
             struct Foo;
         };
         // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), err::PACKED_NOT_SUPPORTED));
+        assert!(has_err(do_derive(s), ReprDeriveError::PackedNotSupported));
     }
 
     #[test]
@@ -150,7 +177,7 @@ mod test {
             struct Foo;
         };
         // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), err::ALIGN_NOT_SUPPORTED));
+        assert!(has_err(do_derive(s), ReprDeriveError::AlignNotSupported));
     }
 
     #[test]
@@ -159,7 +186,7 @@ mod test {
             struct Foo;
         };
         // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), err::STRUCT_NEEDS_REPR_C));
+        assert!(has_err(do_derive(s), ReprDeriveError::StructNeedsReprC));
     }
 
     #[test]
@@ -171,7 +198,7 @@ mod test {
             }
         };
         // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), err::NO_REPR_FOR_UNION));
+        assert!(has_err(do_derive(s), ReprDeriveError::NoReprForUnion));
     }
 
     #[test]
@@ -193,7 +220,7 @@ mod test {
                 BAR = 0,
             }
         };
-        assert!(has_err(do_derive(s), err::NO_PRIM_FOR_ENUM));
+        assert!(has_err(do_derive(s), ReprDeriveError::NoPrimForEnum));
     }
 
     #[test]
@@ -205,7 +232,7 @@ mod test {
                 BAZ,
             }
         };
-        assert!(has_err(do_derive(s), err::FIELDLESS_ENUM_NEEDS_ALL_VALUES));
+        assert!(has_err(do_derive(s), ReprDeriveError::FieldlessEnumNeedsAllValues));
     }
 
     #[test]
@@ -217,7 +244,7 @@ mod test {
                 BAZ = 1,
             }
         };
-        assert!(has_err(do_derive(s), err::FIELD_ENUM_CANNOT_SET_VALUES));
+        assert!(has_err(do_derive(s), ReprDeriveError::FieldEnumCannotSetValues));
     }
 
     #[test]
@@ -230,7 +257,7 @@ mod test {
         };
         assert!(has_err(
             do_derive(s),
-            err::NON_LIFETIME_GENERICS_NOT_SUPPORTED
+            ReprDeriveError::NonLifetimeGenericsNotSupported
         ));
     }
 }

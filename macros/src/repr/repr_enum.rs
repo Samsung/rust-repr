@@ -1,5 +1,5 @@
 /// Tools for deriving Repr for enums.
-use super::err;
+use super::ReprDeriveError;
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, enum_is_empty, enum_is_fieldless,
@@ -291,7 +291,7 @@ pub fn repr_impl_for_enum(
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
     if enum_is_empty(e) {
-        return Err(syn::Error::new(def.span(), err::ENUM_IS_EMPTY));
+        return Err(syn::Error::new(def.span(), ReprDeriveError::EnumIsEmpty));
     }
     let _ = info.get_enum_primitive()?;
 
