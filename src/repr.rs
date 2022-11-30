@@ -197,7 +197,6 @@ use core::marker::PhantomData;
 ///   [module documentation](`self`) for those.
 ///
 /// For usage examples, see [module documentation](`self`).
-pub use repr_macros::IsRepr;
 
 // Implementations for basic types.
 // Compiler complains when trying to use sealed traits for trivial implementations, so we macro our
@@ -428,7 +427,9 @@ impl<Enum: HasRepr> core::fmt::Debug for Repr<Enum> {
 
 #[cfg(test)]
 mod test {
-    use super::{HasRepr, IsRepr, Repr, ReprError};
+    extern crate self as repr;
+    use crate::IsRepr;
+    use super::{HasRepr, Repr, ReprError};
     use core::{
         marker::PhantomData,
         mem::{align_of, size_of, transmute_copy},
