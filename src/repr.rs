@@ -305,6 +305,8 @@ pub struct ReprError;
 /// by the [`IsRepr`] derive macro. In most cases you can rely on [`IsRepr`] to derive this trait
 /// for you.
 ///
+/// # Safety
+///
 /// The following should be satisfied in order for trait implementation to be sound:
 /// * `Self` and `Self::Raw` should have the same memory layout, that is both size and alignment.
 /// * `Self::Raw` should be safe to transmute into from arbitrary memory.
