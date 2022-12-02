@@ -1,7 +1,5 @@
 //! Repr traits and generic types.
 
-use core::marker::PhantomData;
-
 use crate::static_assert::static_check_layout;
 
 /// Error type used when conversion from underlying type fails.
@@ -119,9 +117,9 @@ impl<T: HasRepr> RawTryInto<T> for T::Raw {
 /// let g: Repr<Bar> = unsafe { transmute(Bar::FOO) };
 /// foo(g);
 /// ```
-// Doc for PhantomData say that it's better to use `*const T` so that we don't imply ownership.
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
-pub struct Repr<T: HasRepr>(T::Raw, PhantomData<*const T>);
+pub struct Repr<T: HasRepr>(T::Raw);
 
 impl<T: HasRepr> Repr<T> {
     /// Try to convert `Repr` to the `HasRepr` type.
@@ -138,21 +136,6 @@ impl<T: HasRepr> Repr<T> {
     ///
     /// Useful for converting fieldless enum values like `u8` into `Repr`.
     pub fn from_raw(v: T::Raw) -> Self {
-        Self(v, Default::default())
-    }
-}
-
-// Can't auto-derive Clone and Copy because of PhantomData.
-impl<Enum: HasRepr> Clone for Repr<Enum> {
-    fn clone(&self) -> Self {
-        Self(self.0, Default::default())
-    }
-}
-impl<Enum: HasRepr> Copy for Repr<Enum> {}
-
-// Custom Debug that skips PhantomData.
-impl<Enum: HasRepr> core::fmt::Debug for Repr<Enum> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("Repr").field(&self.0).finish()
+        Self(v)
     }
 }
