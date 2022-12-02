@@ -25,7 +25,7 @@ pub struct ReprError;
 pub unsafe trait HasRepr: Sized {
     /// The underlying type.
     ///
-    /// Except for fieldless enums, this type is opaque.
+    /// Except for fieldless enums, this type is opaque when derived.
     type Raw: Clone + Copy + core::fmt::Debug;
 
     /// Validate that the raw type can be safely transmuted to `Self`.
@@ -50,16 +50,37 @@ pub unsafe trait HasRepr: Sized {
         Ok(unsafe { &*(value as *const Repr<Self> as *const Self) })
     }
 
-    /// Transmute Self into a [`Repr`].
+    /// Transmute `self` into a [`Repr`].
     ///
-    /// In general, converting into `Repr` should be unnecessary, since only external-facing
-    /// interfaces need to work with possibly-invalid values.
+    /// In general, converting *into* `Repr` rathen than *from* it should be unnecessary, since
+    /// only external-facing interfaces need to work with possibly-invalid values.
     fn into_repr(self) -> Repr<Self> {
         unsafe { core::mem::transmute_copy(&self) }
     }
 }
 
-/// Helper trait for converting representations into types. Useful for fieldless enums.
+/// Helper trait for converting from the raw underlying type.
+///
+/// While `Raw` for derived implementations is usually opaque, for fieldless enums it's exactly the
+/// underlying type. This trait allows code like this:
+///
+/// ```
+/// use repr::{IsRepr, RawTryInto};
+///
+/// #[derive(IsRepr, Clone, Copy)]
+/// #[repr(u8)]
+/// enum Foo {
+///     FOO = 1,
+/// }
+///
+/// fn foo(f: u8) -> Option<Foo> {
+///     f.raw_try_into().ok()
+/// }
+///
+/// let f = 5u8;
+/// foo(f);
+/// ```
+///
 pub trait RawTryInto<T: HasRepr> {
     fn raw_try_into(self) -> Result<T, ReprError>;
 }
@@ -108,7 +129,7 @@ impl<T: HasRepr> Repr<T> {
         T::try_from_repr(self)
     }
 
-    /// Try to convert reference to `Repr` to he `HasRepr` type.
+    /// Try to convert reference to `Repr` to the `HasRepr` type.
     pub fn ref_try_into(&self) -> Result<&T, ReprError> {
         T::try_from_ref(self)
     }
@@ -135,4 +156,3 @@ impl<Enum: HasRepr> core::fmt::Debug for Repr<Enum> {
         f.debug_tuple("Repr").field(&self.0).finish()
     }
 }
-

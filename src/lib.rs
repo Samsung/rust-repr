@@ -47,135 +47,6 @@
 //! }
 //! ```
 //!
-//! ## More examples
-//!
-//! [`HasRepr`] can be derived for fieldless enums if all values are explictly specified:
-//! ```
-//! use repr::IsRepr;
-//!
-//! #[derive(IsRepr, Clone, Copy, Debug)]
-//! #[repr(u8)]
-//! enum Foo {
-//!     FOO = 1,
-//!     BAR = 3,
-//! }
-//! ```
-//!
-//! Fieldless enums can be converted directly from their underlying types:
-//! ```
-//! use repr::{HasRepr, IsRepr, Repr, RawTryInto};
-//! use core::mem::transmute;
-//!
-//! #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-//! #[repr(u8)]
-//! enum Foo {
-//!     FOO = 1,
-//!     BAR = 3,
-//! }
-//!
-//! let foo = Foo::FOO;
-//! let foo_u8 = foo as u8;
-//! let foo_2: Foo = foo_u8.raw_try_into().unwrap();
-//! assert_eq!(foo, foo_2);
-//! ```
-//!
-//! It can be derived for enums with fields and for structs, as long as all members implement
-//! [`HasRepr`]:
-//!
-//! ```
-//! mod my_crate {
-//!     use repr::IsRepr;
-//!
-//!     #[derive(IsRepr, Clone, Copy, Debug)]
-//!     #[repr(u8)]
-//!     enum Foo {
-//!         FOO(u8),
-//!         BAR(*const usize),
-//!     }
-//!
-//!     #[derive(IsRepr, Clone, Copy, Debug)]
-//!     #[repr(C)]
-//!     struct Bar {
-//!         foo: u8,
-//!         bar: Foo,
-//!     }
-//! }
-//! ```
-//!
-//! It supports both enum representations, `repr(C, prim)` and `repr(prim)`:
-//!
-//! ```
-//! mod my_crate {
-//!     use repr::IsRepr;
-//!
-//!     #[derive(IsRepr, Clone, Copy, Debug)]
-//!     #[repr(u8)]
-//!     enum Foo {
-//!         FOO(u8),
-//!         BAR(*const usize),
-//!     }
-//!
-//!     #[derive(IsRepr, Clone, Copy, Debug)]
-//!     #[repr(C, u8)]
-//!     enum Bar {
-//!         FOO(u8),
-//!         BAR(*const usize),
-//!     }
-//! }
-//! ```
-//!
-//! [`HasRepr`] types can be converted by reference:
-//!
-//! ```
-//! use repr::{HasRepr, IsRepr, Repr};
-//! use core::mem::transmute;
-//! #[derive(IsRepr, Clone, Copy, Debug)]
-//! #[repr(u8)]
-//! enum Foo {
-//!     FOO = 1,
-//!     BAR = 3,
-//! }
-//!
-//! let foo: Repr<Foo> = unsafe { transmute(Foo::FOO) };
-//! let _foo_ref: &Foo = foo.ref_try_into().unwrap();
-//! ```
-//!
-//! ## `IsRepr` for types with lifetimes
-//!
-//! [`IsRepr`] has basic support for structs with lifetimes, enough to support types like nested
-//! `PhantomData<&'a _>`. This support is implemented by erasing lifetime information in the
-//! underlying type. Any `PhantomData` types are represented by unit `()`, and any data member `t:
-//! T<'a, 'b ...>` is represented by `T<'static, 'static ...>::Raw`.
-//!
-//! Lifetime support extends to the type-checked [`Repr`] type, so code that tries to circumvent
-//! lifetimes by casting to representation and back will not compile:
-//!
-//! ```compile_fail
-//! use repr::{HasRepr, IsRepr, Repr};
-//! use core::marker::PhantomData;
-//!
-//! #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-//! #[repr(C)]
-//! struct WithLifetime<'a> {
-//!     x: u8,
-//!     p: PhantomData<&'a u8>,
-//! }
-//!
-//! fn bad_cast<'a>(wl: WithLifetime<'a>) -> WithLifetime<'static> {
-//!     let el = wl.into_repr();
-//!     let bad_wl: WithLifetime<'static> = el.repr_try_into().unwrap();
-//!     bad_wl
-//! }
-//! ```
-//!
-//! ## Limitations
-//!
-//! * `#[derive(IsRepr)]` should be placed above all `#[repr(C)]`-like attributes, otherwise it's not
-//!   guaranteed to process them.
-//! * Parametrized types with parameters that are not lifetimes are not supported.
-//! * [`repr(transparent)`] is not supported. You can pretty easily derive [`IsRepr`] manually in
-//!   this situation.
-//!
 //! ## Sources
 //!
 //! You can find Rust's type layout guarantees here:
@@ -188,7 +59,137 @@ pub(crate) mod static_assert;
 pub(crate) mod prims;
 pub(crate) mod traits;
 
+/// Automatic derivation of [`HasRepr`].
+///
+/// [`HasRepr`] can be derived for fieldless enums if all values are explicitly specified:
+/// ```
+/// use repr::IsRepr;
+///
+/// #[derive(IsRepr, Clone, Copy, Debug)]
+/// #[repr(u8)]
+/// enum Foo {
+///     FOO = 1,
+///     BAR = 3,
+/// }
+/// ```
+///
+/// Fieldless enums can be converted directly from their underlying types:
+/// ```
+/// use repr::{HasRepr, IsRepr, Repr, RawTryInto};
+/// use core::mem::transmute;
+///
+/// #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+/// #[repr(u8)]
+/// enum Foo {
+///     FOO = 1,
+///     BAR = 3,
+/// }
+///
+/// let foo = Foo::FOO;
+/// let foo_u8 = foo as u8;
+/// let foo_2: Foo = foo_u8.raw_try_into().unwrap();
+/// assert_eq!(foo, foo_2);
+/// ```
+///
+/// It can be derived for enums with fields and for structs, as long as all members implement
+/// [`HasRepr`]:
+///
+/// ```
+/// mod my_crate {
+///     use repr::IsRepr;
+///
+///     #[derive(IsRepr, Clone, Copy, Debug)]
+///     #[repr(u8)]
+///     enum Foo {
+///         FOO(u8),
+///         BAR(*const usize),
+///     }
+///
+///     #[derive(IsRepr, Clone, Copy, Debug)]
+///     #[repr(C)]
+///     struct Bar {
+///         foo: u8,
+///         bar: Foo,
+///     }
+/// }
+/// ```
+///
+/// It supports both enum representations, `repr(C, prim)` and `repr(prim)`:
+///
+/// ```
+/// mod my_crate {
+///     use repr::IsRepr;
+///
+///     #[derive(IsRepr, Clone, Copy, Debug)]
+///     #[repr(u8)]
+///     enum Foo {
+///         FOO(u8),
+///         BAR(*const usize),
+///     }
+///
+///     #[derive(IsRepr, Clone, Copy, Debug)]
+///     #[repr(C, u8)]
+///     enum Bar {
+///         FOO(u8),
+///         BAR(*const usize),
+///     }
+/// }
+/// ```
+///
+/// [`HasRepr`] types can be converted by reference:
+///
+/// ```
+/// use repr::{HasRepr, IsRepr, Repr};
+/// use core::mem::transmute;
+/// #[derive(IsRepr, Clone, Copy, Debug)]
+/// #[repr(u8)]
+/// enum Foo {
+///     FOO = 1,
+///     BAR = 3,
+/// }
+///
+/// let foo: Repr<Foo> = unsafe { transmute(Foo::FOO) };
+/// let _foo_ref: &Foo = foo.ref_try_into().unwrap();
+/// ```
+///
+/// ## `IsRepr` for types with lifetimes
+///
+/// [`IsRepr`] has basic support for structs with lifetimes, enough to support types like nested
+/// `PhantomData<&'a _>`. This support is implemented by erasing lifetime information in the
+/// underlying type. Any `PhantomData` types are represented by unit `()`, and any data member `t:
+/// T<'a, 'b ...>` is represented by `T<'static, 'static ...>::Raw`.
+///
+/// Lifetime support extends to the type-checked [`Repr`] type, so code that tries to circumvent
+/// lifetimes by casting to representation and back will not compile:
+///
+/// ```compile_fail
+/// use repr::{HasRepr, IsRepr, Repr};
+/// use core::marker::PhantomData;
+///
+/// #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+/// #[repr(C)]
+/// struct WithLifetime<'a> {
+///     x: u8,
+///     p: PhantomData<&'a u8>,
+/// }
+///
+/// fn bad_cast<'a>(wl: WithLifetime<'a>) -> WithLifetime<'static> {
+///     let el = wl.into_repr();
+///     let bad_wl: WithLifetime<'static> = el.repr_try_into().unwrap();
+///     bad_wl
+/// }
+/// ```
+///
+/// ## Limitations
+///
+/// * `#[derive(IsRepr)]` should be placed above all `#[repr(C)]`-like attributes, otherwise it's not
+///   guaranteed to process them.
+/// * Parametrized types with parameters that are not lifetimes are not supported.
+/// * [`repr(transparent)`] is not supported. You can pretty easily derive [`IsRepr`] manually in
+///   this situation.
+///
 pub use repr_macros::IsRepr;
+
 pub use traits::{HasRepr, Repr, ReprError, RawTryInto};
 
 // Needed for macros work in tests.
