@@ -1,7 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
-    call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_body, ident_with_generics,
-    impl_statement, unpack_fields, CRATE,
+    call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
+    ident_with_generics, impl_statement, unpack_fields, CRATE,
 };
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
@@ -18,13 +18,13 @@ fn repr_struct(def: &DeriveInput, e: &DataStruct) -> TokenStream {
     let repr_name = struct_repr_name(def);
     let mut repr_fields = e.fields.clone();
     convert_field_types_to_raw(&mut repr_fields);
-    let repr_fields = fields_to_body(repr_fields);
+    let struct_def = fields_to_definition(&repr_name, repr_fields);
 
     quote! {
         #[repr(C)]
         #[derive(Clone, Copy, Debug)]
         // We're defined in a private mod. Allow re-exports.
-        pub struct #repr_name #repr_fields
+        pub #struct_def
     }
 }
 

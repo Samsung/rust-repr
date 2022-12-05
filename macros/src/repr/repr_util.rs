@@ -179,13 +179,13 @@ fn test_prepend_field() {
     }
 }
 
-// Turn a fields struct into struct / enum body, with a semicolon if needed.
-pub fn fields_to_body(fields: Fields) -> TokenStream {
+// Turn a fields struct into struct / enum definition, with a semicolon if needed.
+pub fn fields_to_definition(name: &syn::Ident, fields: Fields) -> syn::ItemStruct {
     let delim = match fields {
         Fields::Named(_) => quote! {},
         _ => quote! {;},
     };
-    quote! { #fields #delim }
+    syn::parse2(quote! { struct #name #fields #delim }).unwrap()
 }
 
 // Turn usize into int literal without suffix.
