@@ -22,6 +22,22 @@ pub fn def_has_non_lifetime_generics(def: &DeriveInput) -> bool {
         .any(|v| !matches!(v, syn::GenericParam::Lifetime(_)))
 }
 
+#[cfg(test)]
+#[test]
+fn test_def_has_non_lifetime_generics() {
+    for (s, res) in [
+        ("struct Foo {}", false),
+        ("struct Foo<'a> {}", false),
+        ("struct Foo<T> {}", true),
+        ("struct Foo<const N: usize> {}", true),
+        ("struct Foo<'a, T> {}", true),
+        ("struct Foo<'a, const N: usize> {}", true),
+    ] {
+        let d: DeriveInput = syn::parse_str(s).unwrap();
+        assert_eq!(def_has_non_lifetime_generics(&d), res);
+    }
+}
+
 // Enum utilities.
 pub fn enum_is_empty(e: &DataEnum) -> bool {
     e.variants.iter().next().is_none()
@@ -80,6 +96,31 @@ pub fn unpack_fields(fields: &Fields, first_name: Option<syn::Ident>) -> TokenSt
             quote! { (#ident_list) }
         }
         _ => quote! {},
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_unpack_fields() {
+    // NOTE: TokenStream doesn't have Eq. Googling suggests there are some macro hygiene reasons
+    // for that, so we compare conversion to string. Is that stable enough to be used in
+    // tests?
+    for (s, first_name, expect) in [
+        ("struct Foo(bool, u64, u8);", None,
+         "(ref _0 , ref _1 , ref _2)"),
+
+        ("struct Foo{a: bool, b: u64, c: u8}", None,
+         "{ a : ref _0 , b : ref _1 , c : ref _2 , }"),
+
+        ("struct Foo(bool, u64, u8);", Some(format_ident!("foo")),
+         "(ref foo , ref _0 , ref _1)"),
+
+        ("struct Foo{a: bool, b: u64, c: u8}", Some(format_ident!("foo")),
+         "{ a : ref foo , b : ref _0 , c : ref _1 , }"),
+    ] {
+        let f: syn::ItemStruct = syn::parse_str(s).unwrap();
+        let tokens = unpack_fields(&f.fields, first_name);
+        assert_eq!(format!("{}", tokens), expect);
     }
 }
 
