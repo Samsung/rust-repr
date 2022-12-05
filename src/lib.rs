@@ -257,6 +257,20 @@ mod test {
     }
 
     #[test]
+    fn test_value_enum_ref() {
+        let mut base_val = <Repr<Foobar>>::from_raw(5);
+        let foo = Foobar::try_from_ref(&base_val).unwrap();
+        assert_eq!(*foo, Foobar::FOO);
+
+        let foo = Foobar::try_from_mut(&mut base_val).unwrap();
+        assert_eq!(*foo, Foobar::FOO);
+
+        *foo = Foobar::BAR;
+
+        assert_eq!(base_val.repr_try_into().unwrap(), Foobar::BAR);
+    }
+
+    #[test]
     fn test_value_enum_param() {
         fn inner(repr: Repr<Foobar>) -> Result<Foobar, ReprError> {
             repr.repr_try_into()

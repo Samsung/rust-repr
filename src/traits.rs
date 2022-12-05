@@ -48,11 +48,19 @@ pub unsafe trait HasRepr: Sized {
         Ok(unsafe { &*(value as *const Repr<Self> as *const Self) })
     }
 
+    /// Convert from mutable reference to [`Repr`] into mutable reference to self.
+    fn try_from_mut(value: &mut Repr<Self>) -> Result<&mut Self, ReprError> {
+        static_check_layout::<Self, Self::Raw>();
+        Self::raw_is_valid(&value.0)?;
+        Ok(unsafe { &mut *(value as *mut Repr<Self> as *mut Self) })
+    }
+
     /// Transmute `self` into a [`Repr`].
     ///
     /// In general, converting *into* `Repr` rathen than *from* it should be unnecessary, since
     /// only external-facing interfaces need to work with possibly-invalid values.
     fn into_repr(self) -> Repr<Self> {
+        static_check_layout::<Self, Self::Raw>();
         unsafe { core::mem::transmute_copy(&self) }
     }
 }
