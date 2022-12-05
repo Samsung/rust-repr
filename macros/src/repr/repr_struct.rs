@@ -32,7 +32,7 @@ fn impl_has_repr(def: &DeriveInput, e: &DataStruct) -> TokenStream {
     let e_ident = ident_with_generics(def);
     let repr_name = struct_repr_name(def);
     let impl_hasrepr = impl_statement(def, quote! { #CRATE::HasRepr }, quote! { #e_ident });
-    let unpacked = unpack_fields(&e.fields, None);
+    let unpacked = unpack_fields(&repr_name, &e.fields, None);
 
     let checks = call_fields_raw_is_valid(&e.fields);
 
@@ -40,7 +40,7 @@ fn impl_has_repr(def: &DeriveInput, e: &DataStruct) -> TokenStream {
         unsafe #impl_hasrepr {
             type Raw = #repr_name;
             fn raw_is_valid(value: &#repr_name) -> Result<(), #CRATE::ReprError> {
-                let #repr_name #unpacked = value;
+                let #unpacked = value;
                 #checks
                 Ok(())
             }

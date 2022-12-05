@@ -2,7 +2,7 @@
 name = "repr_macros"
 version = "0.0.1"
 authors = ["Camellia contributors"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true
@@ -11,3 +11,6 @@ proc-macro = true
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }
 syn = { version = "1.0", features = ["full", "visit-mut"] }
+
+[dev-dependencies]
+syn = { version = "*", features = ["extra-traits"] }

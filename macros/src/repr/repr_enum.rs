@@ -133,16 +133,15 @@ fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream
     }
 }
 
-fn unpacked_variant_repr(variant: &Variant, info: &ReprInfo) -> TokenStream {
+fn unpacked_variant_repr(variant: &Variant, info: &ReprInfo) -> syn::Pat {
     let mut repr_fields = variant.fields.clone();
     let mut unpack_tag = None;
     if !info.is_c {
         prepend_tag(&mut repr_fields, info);
         unpack_tag = Some(tag_member_name());
     }
-    let unpacked = unpack_fields(&repr_fields, unpack_tag);
     let variant_repr_name = variant_repr_name(variant);
-    quote! { #variant_repr_name #unpacked }
+    unpack_fields(&variant_repr_name, &repr_fields, unpack_tag)
 }
 
 // Produces a match branch that calls `raw_is_valid` on all variant members.

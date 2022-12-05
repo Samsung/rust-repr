@@ -75,7 +75,7 @@ pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
 
 // Unpack structs and tuples into variables <_0, _1, ...>.
 // Optionally assign a custom name to first variable, then start counting from 0.
-pub fn unpack_fields(fields: &Fields, first_name: Option<syn::Ident>) -> TokenStream {
+pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, first_name: Option<syn::Ident>) -> syn::Pat {
     let count = if first_name.is_some() {
         fields.len() - 1
     } else {
@@ -86,53 +86,52 @@ pub fn unpack_fields(fields: &Fields, first_name: Option<syn::Ident>) -> TokenSt
         .into_iter()
         .chain((0..count).map(|i| format_ident!("_{}", i)));
 
-    match fields {
+    let raw = match fields {
         Fields::Named(fs) => {
             let fields = fs.named.iter().map(|i| i.ident.as_ref().unwrap());
-            let ident_map = quote! {
-                #(#fields: ref #idents,)*
-            };
-            quote! { {#ident_map} }
+            quote! {
+                #ty { #(#fields: ref #idents),* }
+            }
         }
         Fields::Unnamed(_) => {
-            let ident_list = quote! { #(ref #idents),* };
-            quote! { (#ident_list) }
+            quote! { #ty (#(ref #idents),*) }
         }
-        _ => quote! {},
-    }
+        _ => quote! { #ty },
+    };
+    syn::parse2(raw).unwrap()
 }
 
 #[cfg(test)]
 #[test]
 fn test_unpack_fields() {
-    // NOTE: TokenStream doesn't have Eq. Googling suggests there are some macro hygiene reasons
-    // for that, so we compare conversion to string. Is that stable enough to be used in
-    // tests?
+    let ident = format_ident!("Foo");
     for (s, first_name, expect) in [
         (
             "struct Foo(bool, u64, u8);",
             None,
-            "(ref _0 , ref _1 , ref _2)",
+            "Foo(ref _0 , ref _1 , ref _2)",
         ),
         (
             "struct Foo{a: bool, b: u64, c: u8}",
             None,
-            "{ a : ref _0 , b : ref _1 , c : ref _2 , }",
+            "Foo{a: ref _0, b: ref _1, c: ref _2}",
         ),
         (
             "struct Foo(bool, u64, u8);",
             Some(format_ident!("foo")),
-            "(ref foo , ref _0 , ref _1)",
+            "Foo(ref foo, ref _0, ref _1)",
         ),
         (
             "struct Foo{a: bool, b: u64, c: u8}",
             Some(format_ident!("foo")),
-            "{ a : ref foo , b : ref _0 , c : ref _1 , }",
+            "Foo{a: ref foo, b: ref _0, c: ref _1}",
         ),
+        ("struct Foo;", None, "Foo"),
     ] {
         let f: syn::ItemStruct = syn::parse_str(s).unwrap();
-        let tokens = unpack_fields(&f.fields, first_name);
-        assert_eq!(format!("{}", tokens), expect);
+        let expect: syn::Pat = syn::parse_str(expect).unwrap();
+        let pat = unpack_fields(&ident, &f.fields, first_name);
+        assert_eq!(pat, expect);
     }
 }
 
@@ -154,6 +153,29 @@ pub fn prepend_field(fields: &mut Fields, id: &syn::Ident, ty: &syn::Path) {
             let f: syn::FieldsUnnamed = syn::parse_quote! { (#ty) };
             *fields = f.into();
         }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_prepend_field() {
+    let ident = format_ident!("foo");
+    let ty: syn::Path = syn::parse_str("baz::Bar").unwrap();
+    for (s, expect) in [
+        (
+            "struct Foo(bool, u64, u8);",
+            "struct Foo(baz::Bar, bool, u64, u8);",
+        ),
+        (
+            "struct Foo{a: bool, b: u64}",
+            "struct Foo{foo: baz::Bar, a: bool, b: u64}",
+        ),
+        ("struct Foo;", "struct Foo(baz::Bar);"),
+    ] {
+        let mut f: syn::ItemStruct = syn::parse_str(s).unwrap();
+        let expect: syn::ItemStruct = syn::parse_str(expect).unwrap();
+        prepend_field(&mut f.fields, &ident, &ty);
+        assert!(f == expect);
     }
 }
 
