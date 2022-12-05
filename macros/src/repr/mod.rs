@@ -51,9 +51,6 @@ impl Display for ReprDeriveError {
     }
 }
 
-pub(crate) mod err {
-}
-
 pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
     let d = syn::parse2(input)?;
     if def_has_non_lifetime_generics(&d) {
