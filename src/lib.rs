@@ -55,8 +55,8 @@
 
 #![no_std]
 
-pub(crate) mod static_assert;
 pub(crate) mod prims;
+pub(crate) mod static_assert;
 pub(crate) mod traits;
 
 /// Automatic derivation of [`HasRepr`].
@@ -190,7 +190,7 @@ pub(crate) mod traits;
 ///
 pub use repr_macros::IsRepr;
 
-pub use traits::{HasRepr, Repr, ReprError, RawTryInto};
+pub use traits::{HasRepr, RawTryInto, Repr, ReprError};
 
 // Needed for macros work in tests.
 #[cfg(test)]
@@ -198,7 +198,10 @@ extern crate self as repr;
 
 #[cfg(test)]
 mod test {
-    use crate::{IsRepr, traits::{HasRepr, Repr, ReprError}};
+    use crate::{
+        traits::{HasRepr, Repr, ReprError},
+        IsRepr,
+    };
     use core::{
         marker::PhantomData,
         mem::{align_of, size_of, transmute_copy},

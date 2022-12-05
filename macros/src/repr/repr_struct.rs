@@ -1,9 +1,9 @@
-use super::ReprDeriveError;
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_body, ident_with_generics,
     impl_statement, unpack_fields, CRATE,
 };
+use super::ReprDeriveError;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
@@ -54,7 +54,10 @@ pub fn repr_impl_for_struct(
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
     if !info.is_c {
-        return Err(syn::Error::new(def.span(), ReprDeriveError::StructNeedsReprC));
+        return Err(syn::Error::new(
+            def.span(),
+            ReprDeriveError::StructNeedsReprC,
+        ));
     }
 
     let repr_struct = repr_struct(def, e);

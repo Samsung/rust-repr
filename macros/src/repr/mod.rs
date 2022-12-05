@@ -39,7 +39,9 @@ impl Display for ReprDeriveError {
             Self::UnexpectedRepr => "Unexpected repr item",
             Self::NoPrimForEnum => "Enum does not specify a fixed repr type",
             Self::EnumIsEmpty => "Enum cannot be empty",
-            Self::FieldlessEnumNeedsAllValues => "Fieldless enum should specify values for all variants",
+            Self::FieldlessEnumNeedsAllValues => {
+                "Fieldless enum should specify values for all variants"
+            }
             Self::FieldEnumCannotSetValues => "Enum with fields cannot specify values for variants",
             Self::PackedNotSupported => "Packed structs are not supported yet",
             Self::AlignNotSupported => "Aligned structs/enums are not supported yet",
@@ -56,18 +58,23 @@ pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
     if def_has_non_lifetime_generics(&d) {
         return Err(syn::Error::new(
             d.span(),
-            ReprDeriveError::NonLifetimeGenericsNotSupported
+            ReprDeriveError::NonLifetimeGenericsNotSupported,
         ));
     }
 
     let info = get_repr_type(&d)?;
 
     if info.packed.is_some() {
-        return Err(syn::Error::new(d.span(),
-        ReprDeriveError::PackedNotSupported));
+        return Err(syn::Error::new(
+            d.span(),
+            ReprDeriveError::PackedNotSupported,
+        ));
     }
     if info.align.is_some() {
-        return Err(syn::Error::new(d.span(), ReprDeriveError::AlignNotSupported));
+        return Err(syn::Error::new(
+            d.span(),
+            ReprDeriveError::AlignNotSupported,
+        ));
     }
 
     match &d.data {
@@ -229,7 +236,10 @@ mod test {
                 BAZ,
             }
         };
-        assert!(has_err(do_derive(s), ReprDeriveError::FieldlessEnumNeedsAllValues));
+        assert!(has_err(
+            do_derive(s),
+            ReprDeriveError::FieldlessEnumNeedsAllValues
+        ));
     }
 
     #[test]
@@ -241,7 +251,10 @@ mod test {
                 BAZ = 1,
             }
         };
-        assert!(has_err(do_derive(s), ReprDeriveError::FieldEnumCannotSetValues));
+        assert!(has_err(
+            do_derive(s),
+            ReprDeriveError::FieldEnumCannotSetValues
+        ));
     }
 
     #[test]

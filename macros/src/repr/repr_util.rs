@@ -64,7 +64,10 @@ pub fn enum_should_have_all_discriminants(e: &DataEnum) -> syn::Result<()> {
 pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
     for v in e.variants.iter() {
         if v.discriminant.is_some() {
-            return Err(syn::Error::new(v.span(), ReprDeriveError::FieldEnumCannotSetValues));
+            return Err(syn::Error::new(
+                v.span(),
+                ReprDeriveError::FieldEnumCannotSetValues,
+            ));
         }
     }
     Ok(())
@@ -106,17 +109,26 @@ fn test_unpack_fields() {
     // for that, so we compare conversion to string. Is that stable enough to be used in
     // tests?
     for (s, first_name, expect) in [
-        ("struct Foo(bool, u64, u8);", None,
-         "(ref _0 , ref _1 , ref _2)"),
-
-        ("struct Foo{a: bool, b: u64, c: u8}", None,
-         "{ a : ref _0 , b : ref _1 , c : ref _2 , }"),
-
-        ("struct Foo(bool, u64, u8);", Some(format_ident!("foo")),
-         "(ref foo , ref _0 , ref _1)"),
-
-        ("struct Foo{a: bool, b: u64, c: u8}", Some(format_ident!("foo")),
-         "{ a : ref foo , b : ref _0 , c : ref _1 , }"),
+        (
+            "struct Foo(bool, u64, u8);",
+            None,
+            "(ref _0 , ref _1 , ref _2)",
+        ),
+        (
+            "struct Foo{a: bool, b: u64, c: u8}",
+            None,
+            "{ a : ref _0 , b : ref _1 , c : ref _2 , }",
+        ),
+        (
+            "struct Foo(bool, u64, u8);",
+            Some(format_ident!("foo")),
+            "(ref foo , ref _0 , ref _1)",
+        ),
+        (
+            "struct Foo{a: bool, b: u64, c: u8}",
+            Some(format_ident!("foo")),
+            "{ a : ref foo , b : ref _0 , c : ref _1 , }",
+        ),
     ] {
         let f: syn::ItemStruct = syn::parse_str(s).unwrap();
         let tokens = unpack_fields(&f.fields, first_name);

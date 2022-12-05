@@ -25,8 +25,10 @@ impl ReprInfo {
 
     pub fn set_primitive(&mut self, p: syn::Path) -> syn::Result<()> {
         if self.primitive.is_some() {
-            return Err(syn::Error::new(p.span(), ReprDeriveError::MultiplePrimitives));
-
+            return Err(syn::Error::new(
+                p.span(),
+                ReprDeriveError::MultiplePrimitives,
+            ));
         }
         self.primitive = Some(p);
         Ok(())
@@ -88,7 +90,10 @@ fn extract_repr_info(l: &MetaList, info: &mut ReprInfo) -> syn::Result<()> {
                 } else if is_primitive(p) {
                     info.set_primitive(p.clone())?;
                 } else {
-                    return Err(syn::Error::new(item.span(), ReprDeriveError::UnexpectedRepr));
+                    return Err(syn::Error::new(
+                        item.span(),
+                        ReprDeriveError::UnexpectedRepr,
+                    ));
                 }
             }
             NestedMeta::Meta(Meta::List(l)) => {
@@ -103,10 +108,20 @@ fn extract_repr_info(l: &MetaList, info: &mut ReprInfo) -> syn::Result<()> {
                             info.set_align(i)?;
                         }
                     }
-                    _ => return Err(syn::Error::new(item.span(), ReprDeriveError::InvalidPackedAlign)),
+                    _ => {
+                        return Err(syn::Error::new(
+                            item.span(),
+                            ReprDeriveError::InvalidPackedAlign,
+                        ))
+                    }
                 }
             }
-            _ => return Err(syn::Error::new(item.span(), ReprDeriveError::UnexpectedRepr)),
+            _ => {
+                return Err(syn::Error::new(
+                    item.span(),
+                    ReprDeriveError::UnexpectedRepr,
+                ))
+            }
         }
     }
     Ok(())

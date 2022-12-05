@@ -1,11 +1,11 @@
-/// Tools for deriving Repr for enums.
-use super::ReprDeriveError;
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, enum_is_empty, enum_is_fieldless,
     enum_should_have_all_discriminants, enum_should_have_no_discriminants, fields_to_body,
     ident_with_generics, impl_statement, int_literal, prepend_field, unpack_fields, CRATE,
 };
+/// Tools for deriving Repr for enums.
+use super::ReprDeriveError;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;

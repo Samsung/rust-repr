@@ -76,4 +76,3 @@ unsafe impl<T: HasRepr, const N: usize> HasRepr for [T; N] {
         Ok(())
     }
 }
-
