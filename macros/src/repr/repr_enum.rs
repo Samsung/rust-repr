@@ -2,7 +2,7 @@ use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, enum_is_empty, enum_is_fieldless,
     enum_should_have_all_discriminants, enum_should_have_no_discriminants, fields_to_definition,
-    ident_with_generics, impl_statement, int_literal, prepend_field, unpack_fields, CRATE,
+    ident_with_generics, impl_statement, int_literal, prepend_field, unpack_fields, CRATE, underlying_type_repr_attr,
 };
 /// Tools for deriving Repr for enums.
 use super::ReprDeriveError;
@@ -111,12 +111,13 @@ fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream
     });
     let union_name = union_repr_name(def);
     let repr_name = enum_repr_name(def);
+    let repr_attr = underlying_type_repr_attr(info);
 
     // TODO support non-repr(C) enums as well.
     quote! {
         #(#structs)*
 
-        #[repr(C)]
+        #repr_attr
         #[derive(Clone, Copy)]
         #[allow(non_snake_case)]
         union #union_name {
@@ -124,7 +125,7 @@ fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream
             #(#union_members,)*
         }
 
-        #[repr(C)]
+        #repr_attr
         #[derive(Clone, Copy)]
         pub struct #repr_name {  // We're defined in a private mod. Allow re-exports.
             #outer_tag

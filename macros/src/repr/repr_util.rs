@@ -1,6 +1,6 @@
 //! Various macro utilities.
 
-use super::ReprDeriveError;
+use super::{ReprDeriveError, repr_type::ReprInfo};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse::Parser, spanned::Spanned, visit_mut::VisitMut, DataEnum, DeriveInput, Fields};
@@ -272,4 +272,12 @@ pub fn impl_statement(def: &DeriveInput, impl_: TokenStream, for_: TokenStream) 
         let where_clause = &def.generics.where_clause;
         quote! { impl<#generics> #impl_ for #for_ #where_clause }
     }
+}
+
+pub fn underlying_type_repr_attr(info: &ReprInfo) -> TokenStream {
+    let mut repr_items: Vec<TokenStream> = vec![quote!(C)];
+    if let Some(a) = &info.align {
+        repr_items.push(quote!(align(#a)));
+    }
+    quote!(#[repr(#(#repr_items),*)])
 }

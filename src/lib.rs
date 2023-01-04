@@ -583,4 +583,34 @@ mod test {
         // Basically test if it's properly generated and nothing more.
         test_to_repr_and_back_is_id(OuterLifetime(core::ptr::null()));
     }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, align(16))]
+    struct AlignedU32 {
+        x: u32,
+        y: u32,
+        z: u32,
+        t: u32,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, align(16))]
+    struct HasAlignedU32 {
+        foo: u32,
+        bar: AlignedU32,
+    }
+
+    #[test]
+    fn test_aligned_struct() {
+        let a = HasAlignedU32 {
+            foo: 1,
+            bar: AlignedU32 {
+                x: 2,
+                y: 3,
+                z: 4,
+                t: 5,
+            }
+        };
+        test_to_repr_and_back_is_id(a);
+    }
 }

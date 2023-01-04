@@ -23,7 +23,6 @@ enum ReprDeriveError {
     FieldlessEnumNeedsAllValues,
     FieldEnumCannotSetValues,
     PackedNotSupported,
-    AlignNotSupported,
     NonLifetimeGenericsNotSupported,
     StructNeedsReprC,
     NoReprForUnion,
@@ -44,7 +43,6 @@ impl Display for ReprDeriveError {
             }
             Self::FieldEnumCannotSetValues => "Enum with fields cannot specify values for variants",
             Self::PackedNotSupported => "Packed structs are not supported yet",
-            Self::AlignNotSupported => "Aligned structs/enums are not supported yet",
             Self::NonLifetimeGenericsNotSupported => "Non-lifetime generics are not supported",
             Self::StructNeedsReprC => "Repr for structs needs repr(C)",
             Self::NoReprForUnion => "Repr can't be derived for unions",
@@ -68,12 +66,6 @@ pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
         return Err(syn::Error::new(
             d.span(),
             ReprDeriveError::PackedNotSupported,
-        ));
-    }
-    if info.align.is_some() {
-        return Err(syn::Error::new(
-            d.span(),
-            ReprDeriveError::AlignNotSupported,
         ));
     }
 
@@ -180,8 +172,7 @@ mod test {
             #[repr(C, align(4))]
             struct Foo;
         };
-        // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), ReprDeriveError::AlignNotSupported));
+        do_derive(s).unwrap();
     }
 
     #[test]

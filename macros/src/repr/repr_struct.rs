@@ -1,7 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
-    ident_with_generics, impl_statement, unpack_fields, CRATE,
+    ident_with_generics, impl_statement, unpack_fields, CRATE, underlying_type_repr_attr,
 };
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
@@ -14,14 +14,15 @@ fn struct_repr_name(def: &DeriveInput) -> syn::Ident {
     format_ident!("{}Repr", def.ident)
 }
 
-fn repr_struct(def: &DeriveInput, e: &DataStruct) -> TokenStream {
+fn repr_struct(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStream {
     let repr_name = struct_repr_name(def);
     let mut repr_fields = e.fields.clone();
     convert_field_types_to_raw(&mut repr_fields);
     let struct_def = fields_to_definition(&repr_name, repr_fields);
+    let repr_attr = underlying_type_repr_attr(info);
 
     quote! {
-        #[repr(C)]
+        #repr_attr
         #[derive(Clone, Copy, Debug)]
         // We're defined in a private mod. Allow re-exports.
         pub #struct_def
@@ -60,7 +61,7 @@ pub fn repr_impl_for_struct(
         ));
     }
 
-    let repr_struct = repr_struct(def, e);
+    let repr_struct = repr_struct(def, e, info);
     let impl_hasrepr = impl_has_repr(def, e);
 
     let out = quote! {
