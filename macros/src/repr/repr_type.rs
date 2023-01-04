@@ -134,3 +134,30 @@ pub fn get_repr_type(d: &DeriveInput) -> syn::Result<ReprInfo> {
     }
     Ok(info)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use quote::quote;
+
+    #[test]
+    fn test_repr_info_align() {
+        let formats = vec![
+            quote! {
+                #[repr(C, align(8))]
+                struct Foobar;
+            },
+            quote! {
+                #[repr(C)]
+                #[repr(align(8))]
+                struct Foobar;
+            }
+        ];
+
+        for f in formats {
+            let di: DeriveInput = syn::parse2(f).unwrap();
+            let ri = get_repr_type(&di).unwrap();
+            assert!(ri.align.unwrap().to_string() == "8")
+        }
+    }
+}
