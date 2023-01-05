@@ -613,4 +613,67 @@ mod test {
         };
         test_to_repr_and_back_is_id(a);
     }
+
+    // Aligned enum behaves as if it was wrapped in a newtype struct with the specified alignment.
+    // That is, its contents are unaffected by align, only its alignment as a whole.
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(u8, align(4))]
+    #[allow(dead_code)]
+    enum AlignedEnum {
+        Bar,
+        Foo(u8),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct HasAlignedEnum {
+        foo: u8,
+        bar: AlignedEnum,
+    }
+
+    #[test]
+    fn test_aligned_enum() {
+        let a = HasAlignedEnum {
+            foo: 1,
+            bar: AlignedEnum::Foo(2),
+        };
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+
+        unsafe {
+            test_2_equal(&a, &a_repr, &1u8, 4);    // Aligned enum start, tag
+            test_2_equal(&a, &a_repr, &2u8, 5);    // Aligned enum data
+        }
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, u8, align(4))]
+    #[allow(dead_code)]
+    enum AlignedCEnum {
+        Bar(u16),
+        Foo(u8),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct HasAlignedCEnum {
+        foo: u8,
+        bar: AlignedCEnum,
+    }
+
+    #[test]
+    fn test_aligned_c_enum() {
+        let a = HasAlignedCEnum {
+            foo: 1,
+            bar: AlignedCEnum::Foo(2),
+        };
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+
+        unsafe {
+            test_2_equal(&a, &a_repr, &1u8, 4);    // Aligned enum start, tag
+            test_2_equal(&a, &a_repr, &2u8, 6);    // Inner union start, alignment 2
+        }
+    }
 }

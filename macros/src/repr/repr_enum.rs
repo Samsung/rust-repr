@@ -113,11 +113,10 @@ fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream
     let repr_name = enum_repr_name(def);
     let repr_attr = underlying_type_repr_attr(info);
 
-    // TODO support non-repr(C) enums as well.
     quote! {
         #(#structs)*
 
-        #repr_attr
+        #[repr(C)]
         #[derive(Clone, Copy)]
         #[allow(non_snake_case)]
         union #union_name {
