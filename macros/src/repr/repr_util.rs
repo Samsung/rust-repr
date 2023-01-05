@@ -75,7 +75,9 @@ pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
 
 // Unpack structs and tuples into variables <_0, _1, ...>.
 // Optionally assign a custom name to first variable, then start counting from 0.
-pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, first_name: Option<syn::Ident>) -> syn::Pat {
+// The 'ref' argument controls whether the unpacked fields are references or copies. This is
+// relevant when unpacking a packed struct/enum.
+pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, ref_: bool, first_name: Option<syn::Ident>) -> syn::Pat {
     let count = if first_name.is_some() {
         fields.len() - 1
     } else {
@@ -86,15 +88,21 @@ pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, first_name: Option<syn::I
         .into_iter()
         .chain((0..count).map(|i| format_ident!("_{}", i)));
 
+    let maybe_ref = if ref_ {
+        quote!(ref)
+    } else {
+        quote!()
+    };
+
     let raw = match fields {
         Fields::Named(fs) => {
             let fields = fs.named.iter().map(|i| i.ident.as_ref().unwrap());
             quote! {
-                #ty { #(#fields: ref #idents),* }
+                #ty { #(#fields: #maybe_ref #idents),* }
             }
         }
         Fields::Unnamed(_) => {
-            quote! { #ty (#(ref #idents),*) }
+            quote! { #ty (#(#maybe_ref #idents),*) }
         }
         _ => quote! { #ty },
     };
@@ -105,32 +113,42 @@ pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, first_name: Option<syn::I
 #[test]
 fn test_unpack_fields() {
     let ident = format_ident!("Foo");
-    for (s, first_name, expect) in [
+    for (s, ref_, first_name, expect) in [
         (
             "struct Foo(bool, u64, u8);",
+            true,
             None,
             "Foo(ref _0 , ref _1 , ref _2)",
         ),
         (
             "struct Foo{a: bool, b: u64, c: u8}",
+            true,
             None,
             "Foo{a: ref _0, b: ref _1, c: ref _2}",
         ),
         (
             "struct Foo(bool, u64, u8);",
+            true,
             Some(format_ident!("foo")),
             "Foo(ref foo, ref _0, ref _1)",
         ),
         (
             "struct Foo{a: bool, b: u64, c: u8}",
+            true,
             Some(format_ident!("foo")),
             "Foo{a: ref foo, b: ref _0, c: ref _1}",
         ),
-        ("struct Foo;", None, "Foo"),
+        ("struct Foo;", true, None, "Foo"),
+        (
+            "struct Foo(bool, u64, u8);",
+            false,
+            None,
+            "Foo(_0 , _1 , _2)",
+        ),
     ] {
         let f: syn::ItemStruct = syn::parse_str(s).unwrap();
         let expect: syn::Pat = syn::parse_str(expect).unwrap();
-        let pat = unpack_fields(&ident, &f.fields, first_name);
+        let pat = unpack_fields(&ident, &f.fields, ref_, first_name);
         assert_eq!(pat, expect);
     }
 }
@@ -228,15 +246,22 @@ pub fn convert_field_types_to_raw(fields: &mut Fields) {
 }
 
 // Call raw_is_valid for unpacked fields <_0, _1, ...>.
-pub fn call_fields_raw_is_valid(fields: &Fields) -> TokenStream {
+// _ref specifies whether the fields are references or not.
+pub fn call_fields_raw_is_valid(fields: &Fields, _ref: bool) -> TokenStream {
     let mut fd = fields.clone();
     statify_lifetimes(&mut fd);
     convert_field_types_to_repr(&mut fd);
 
+    let maybe_ref = if _ref {
+        quote!()
+    } else {
+        quote!(&)
+    };
+
     let idents = (0..fields.len()).map(|i| format_ident!("_{}", i));
     let types = fd.iter().map(|f| &f.ty);
     quote! {
-        #(#types::raw_is_valid(#idents)?;)*
+        #(#types::raw_is_valid(#maybe_ref #idents)?;)*
     }
 }
 
@@ -278,6 +303,9 @@ pub fn underlying_type_repr_attr(info: &ReprInfo) -> TokenStream {
     let mut repr_items: Vec<TokenStream> = vec![quote!(C)];
     if let Some(a) = &info.align {
         repr_items.push(quote!(align(#a)));
+    }
+    if let Some(a) = &info.packed {
+        repr_items.push(quote!(packed(#a)));
     }
     quote!(#[repr(#(#repr_items),*)])
 }

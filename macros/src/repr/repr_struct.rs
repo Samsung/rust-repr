@@ -29,19 +29,25 @@ fn repr_struct(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStrea
     }
 }
 
-fn impl_has_repr(def: &DeriveInput, e: &DataStruct) -> TokenStream {
+fn impl_has_repr(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStream {
     let e_ident = ident_with_generics(def);
     let repr_name = struct_repr_name(def);
     let impl_hasrepr = impl_statement(def, quote! { #CRATE::HasRepr }, quote! { #e_ident });
-    let unpacked = unpack_fields(&repr_name, &e.fields, None);
 
-    let checks = call_fields_raw_is_valid(&e.fields);
+    let unpack_by_value = info.packed.is_some();
+    let maybe_deref = if unpack_by_value {
+        quote!(*)
+    } else {
+        quote!()
+    };
+    let unpacked = unpack_fields(&repr_name, &e.fields, !unpack_by_value, None);
+    let checks = call_fields_raw_is_valid(&e.fields, !unpack_by_value);
 
     quote! {
         unsafe #impl_hasrepr {
             type Raw = #repr_name;
             fn raw_is_valid(value: &#repr_name) -> Result<(), #CRATE::ReprError> {
-                let #unpacked = value;
+                let #unpacked = #maybe_deref value;
                 #checks
                 Ok(())
             }
@@ -62,7 +68,7 @@ pub fn repr_impl_for_struct(
     }
 
     let repr_struct = repr_struct(def, e, info);
-    let impl_hasrepr = impl_has_repr(def, e);
+    let impl_hasrepr = impl_has_repr(def, e, info);
 
     let out = quote! {
         #repr_struct

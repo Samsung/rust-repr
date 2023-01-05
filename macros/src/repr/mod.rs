@@ -22,7 +22,7 @@ enum ReprDeriveError {
     EnumIsEmpty,
     FieldlessEnumNeedsAllValues,
     FieldEnumCannotSetValues,
-    PackedNotSupported,
+    PackedEnum,
     NonLifetimeGenericsNotSupported,
     StructNeedsReprC,
     NoReprForUnion,
@@ -42,7 +42,7 @@ impl Display for ReprDeriveError {
                 "Fieldless enum should specify values for all variants"
             }
             Self::FieldEnumCannotSetValues => "Enum with fields cannot specify values for variants",
-            Self::PackedNotSupported => "Packed structs are not supported yet",
+            Self::PackedEnum => "Rust does not support packed enums",
             Self::NonLifetimeGenericsNotSupported => "Non-lifetime generics are not supported",
             Self::StructNeedsReprC => "Repr for structs needs repr(C)",
             Self::NoReprForUnion => "Repr can't be derived for unions",
@@ -63,14 +63,18 @@ pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
     let info = get_repr_type(&d)?;
 
     if info.packed.is_some() {
-        return Err(syn::Error::new(
-            d.span(),
-            ReprDeriveError::PackedNotSupported,
-        ));
     }
 
     match &d.data {
-        syn::Data::Enum(e) => repr_impl_for_enum(&d, e, &info),
+        syn::Data::Enum(e) => {
+            if info.packed.is_some() {
+                return Err(syn::Error::new(
+                    d.span(),
+                    ReprDeriveError::PackedEnum,
+                ));
+            };
+            repr_impl_for_enum(&d, e, &info)
+        }
         syn::Data::Struct(s) => repr_impl_for_struct(&d, s, &info),
         _ => Err(syn::Error::new(d.span(), ReprDeriveError::NoReprForUnion)),
     }
@@ -160,10 +164,12 @@ mod test {
     fn test_struct_bare_packed() {
         let s = quote! {
             #[repr(C, packed)]
-            struct Foo;
+            enum Foo {
+                Bar,
+            }
         };
         // TODO should be implemented in the future
-        assert!(has_err(do_derive(s), ReprDeriveError::PackedNotSupported));
+        assert!(has_err(do_derive(s), ReprDeriveError::PackedEnum));
     }
 
     #[test]

@@ -141,7 +141,7 @@ fn unpacked_variant_repr(variant: &Variant, info: &ReprInfo) -> syn::Pat {
         unpack_tag = Some(tag_member_name());
     }
     let variant_repr_name = variant_repr_name(variant);
-    unpack_fields(&variant_repr_name, &repr_fields, unpack_tag)
+    unpack_fields(&variant_repr_name, &repr_fields, true, unpack_tag)
 }
 
 // Produces a match branch that calls `raw_is_valid` on all variant members.
@@ -153,7 +153,7 @@ fn check_variant(
 ) -> TokenStream {
     let unpacked_variant_repr = unpacked_variant_repr(variant, info);
 
-    let checks = call_fields_raw_is_valid(&variant.fields);
+    let checks = call_fields_raw_is_valid(&variant.fields, true);
     let union_field_name = variant_field_name(variant);
     let tag_literal = int_literal(tag, repr_var.span());
 

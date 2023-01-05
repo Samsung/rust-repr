@@ -224,12 +224,15 @@ mod test {
         s: &Struct,
         m: &Member,
         offset: usize,
+        unaligned: bool,
     ) {
         let raw_ptr = s as *const Struct as *const u8;
         let member_ptr = raw_ptr.offset(offset as isize) as *const Member;
-        assert_eq!(member_ptr.align_offset(align_of::<Member>()), 0);
+        if !unaligned {
+            assert_eq!(member_ptr.align_offset(align_of::<Member>()), 0);
+        }
 
-        let member = member_ptr.read();
+        let member = member_ptr.read_unaligned();
         assert_eq!(&member, m);
     }
 
@@ -239,8 +242,8 @@ mod test {
         m: &Member,
         offset: usize,
     ) {
-        test_equal(s1, m, offset);
-        test_equal(s2, m, offset);
+        test_equal(s1, m, offset, false);
+        test_equal(s2, m, offset, false);
     }
 
     #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
@@ -674,6 +677,64 @@ mod test {
         unsafe {
             test_2_equal(&a, &a_repr, &1u8, 4);    // Aligned enum start, tag
             test_2_equal(&a, &a_repr, &2u8, 6);    // Inner union start, alignment 2
+        }
+    }
+
+    // Packed enums are disallowed in Rust.
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, packed)]
+    struct Packed {
+        foo: u8,
+        bar: u32,
+        baz: u64,
+    }
+
+    #[test]
+    fn test_packed() {
+        let a = Packed {
+            foo: 1,
+            bar: 2,
+            baz: 3,
+        };
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+
+        unsafe {
+            test_equal(&a, &1u8, 0, true);
+            test_equal(&a_repr, &1u8, 0, true);
+            test_equal(&a, &2u32, 1, true);
+            test_equal(&a_repr, &2u32, 1, true);
+            test_equal(&a, &3u64, 5, true);
+            test_equal(&a_repr, &3u64, 5, true);
+        }
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, packed(2))]
+    struct Packed2 {
+        foo: u8,
+        bar: u32,
+        baz: u64,
+    }
+
+    #[test]
+    fn test_packed2() {
+        let a = Packed2 {
+            foo: 1,
+            bar: 2,
+            baz: 3,
+        };
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+
+        unsafe {
+            test_equal(&a, &1u8, 0, true);
+            test_equal(&a_repr, &1u8, 0, true);
+            test_equal(&a, &2u32, 2, true);
+            test_equal(&a_repr, &2u32, 2, true);
+            test_equal(&a, &3u64, 6, true);
+            test_equal(&a_repr, &3u64, 6, true);
         }
     }
 }
