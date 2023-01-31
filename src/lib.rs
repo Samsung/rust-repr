@@ -612,7 +612,7 @@ mod test {
                 y: 3,
                 z: 4,
                 t: 5,
-            }
+            },
         };
         test_to_repr_and_back_is_id(a);
     }
@@ -645,8 +645,8 @@ mod test {
         let a_repr = to_repr(&a);
 
         unsafe {
-            test_2_equal(&a, &a_repr, &1u8, 4);    // Aligned enum start, tag
-            test_2_equal(&a, &a_repr, &2u8, 5);    // Aligned enum data
+            test_2_equal(&a, &a_repr, &1u8, 4); // Aligned enum start, tag
+            test_2_equal(&a, &a_repr, &2u8, 5); // Aligned enum data
         }
     }
 
@@ -675,8 +675,8 @@ mod test {
         let a_repr = to_repr(&a);
 
         unsafe {
-            test_2_equal(&a, &a_repr, &1u8, 4);    // Aligned enum start, tag
-            test_2_equal(&a, &a_repr, &2u8, 6);    // Inner union start, alignment 2
+            test_2_equal(&a, &a_repr, &1u8, 4); // Aligned enum start, tag
+            test_2_equal(&a, &a_repr, &2u8, 6); // Inner union start, alignment 2
         }
     }
 
