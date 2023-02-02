@@ -76,3 +76,12 @@ unsafe impl<T: HasRepr, const N: usize> HasRepr for [T; N] {
         Ok(())
     }
 }
+
+// Empty tuple is guaranteed to have size 0 and alignment 1, and works fine in repr(C) types.
+unsafe impl HasRepr for () {
+    type Raw = ();
+
+    fn raw_is_valid(_value: &Self::Raw) -> Result<(), ReprError> {
+        Ok(())
+    }
+}

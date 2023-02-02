@@ -60,7 +60,7 @@ pub fn repr_impl_for_struct(
     e: &DataStruct,
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
-    if !info.is_c {
+    if !info.is_c && !info.is_transparent {
         return Err(syn::Error::new(
             def.span(),
             ReprDeriveError::StructNeedsReprC,

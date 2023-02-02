@@ -11,19 +11,60 @@ use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 use syn::{DataEnum, DeriveInput, Variant};
 
+trait EnumReprInfo {
+    fn has_inner_tag(&self) -> bool;
+    fn has_outer_tag(&self) -> bool;
+    fn get_enum_primitive(&self) -> syn::Result<syn::Path>;
+}
+
+impl EnumReprInfo for ReprInfo {
+    // Transparent representation does not have a tag. It's okay to union all its fields, because
+    // all ZSTs have to have alignment of 1.
+    fn has_inner_tag(&self) -> bool {
+        !self.is_transparent && !self.is_c
+    }
+
+    fn has_outer_tag(&self) -> bool {
+        !self.is_transparent && self.is_c
+    }
+
+    // TODO validate by enum / struct
+    fn get_enum_primitive(&self) -> syn::Result<syn::Path> {
+        self.primitive
+            .clone()
+            .ok_or_else(|| syn::Error::new(self.span, ReprDeriveError::NoPrimForEnum))
+    }
+}
+
 // First, the easy case. No generics, since enum is fieldless.
 pub fn repr_impl_for_fieldless_enum(
     def: &DeriveInput,
     e: &DataEnum,
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
-    let prim = info.get_enum_primitive()?;
-    enum_should_have_all_discriminants(e)?;
+    let prim = if info.is_transparent {
+        quote! { () }
+    } else {
+        let prim = info.get_enum_primitive()?;
+        quote! { #prim }
+    };
+
+    if !info.is_transparent {
+        enum_should_have_all_discriminants(e)?;
+    }
 
     let e_ident = &def.ident;
 
     let try_from_match = e.variants.iter().map(|v| {
-        let disc = &v.discriminant.as_ref().unwrap().1;
+        // If we're not transparent, we're guaranteed to have all discriminants thanks to the check
+        // above. Otherwise, we should have exactly one variant and it's okay to match '_'.
+        let disc = match v.discriminant.as_ref() {
+            Some(x) => {
+                let val = &x.1;
+                quote! { #val }
+            }
+            None => quote! { _ },
+        };
         quote! { #disc => Ok(()) }
     });
 
@@ -72,7 +113,7 @@ fn prepend_tag(fields: &mut syn::Fields, info: &ReprInfo) {
     prepend_field(
         fields,
         &tag_member_name(),
-        info.get_enum_primitive().unwrap(),
+        &info.get_enum_primitive().unwrap(),
     );
 }
 
@@ -81,7 +122,7 @@ fn repr_struct_for_variant(variant: &syn::Variant, info: &ReprInfo) -> TokenStre
 
     let mut repr_fields = variant.fields.clone();
     convert_field_types_to_raw(&mut repr_fields);
-    if !info.is_c {
+    if info.has_inner_tag() {
         prepend_tag(&mut repr_fields, info);
     }
     let struct_def = fields_to_definition(&repr_name, repr_fields);
@@ -95,14 +136,21 @@ fn repr_struct_for_variant(variant: &syn::Variant, info: &ReprInfo) -> TokenStre
 
 fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream {
     let tag_member = tag_member_name();
-    let tag_type = info.get_enum_primitive().unwrap();
-    let tag_member = quote! { #tag_member: #tag_type, };
-    let (outer_tag, inner_tag) = if info.is_c {
-        (tag_member, quote! {})
-    } else {
-        (quote! {}, tag_member)
+    let tag_member = || {
+        let tag_type = info.get_enum_primitive().unwrap();
+        quote! { #tag_member: #tag_type,}
     };
 
+    let inner_tag = if info.has_inner_tag() {
+        tag_member()
+    } else {
+        quote! {}
+    };
+    let outer_tag = if info.has_outer_tag() {
+        tag_member()
+    } else {
+        quote! {}
+    };
     let structs = e.variants.iter().map(|v| repr_struct_for_variant(v, info));
     let union_members = e.variants.iter().map(|v| {
         let name = variant_repr_name(v);
@@ -136,7 +184,7 @@ fn repr_structs(def: &DeriveInput, e: &DataEnum, info: &ReprInfo) -> TokenStream
 fn unpacked_variant_repr(variant: &Variant, info: &ReprInfo) -> syn::Pat {
     let mut repr_fields = variant.fields.clone();
     let mut unpack_tag = None;
-    if !info.is_c {
+    if info.has_inner_tag() {
         prepend_tag(&mut repr_fields, info);
         unpack_tag = Some(tag_member_name());
     }
@@ -180,7 +228,10 @@ fn repr_to_debug(variant: &Variant, fmt_var: &syn::Ident, tag: usize) -> TokenSt
 
 fn access_tag_member(info: &ReprInfo, val: &syn::Ident) -> TokenStream {
     let tag_member = tag_member_name();
-    if info.is_c {
+    if info.is_transparent {
+        // little convenience hack: we match 0 to 0 so that transparent case looks similar.
+        quote! { 0 }
+    } else if info.is_c {
         quote! { #val.#tag_member }
     } else {
         quote! { unsafe { #val.u.#tag_member }}
@@ -292,7 +343,10 @@ pub fn repr_impl_for_enum(
     if enum_is_empty(e) {
         return Err(syn::Error::new(def.span(), ReprDeriveError::EnumIsEmpty));
     }
-    let _ = info.get_enum_primitive()?;
+    // If enum is transparent, it's allowed not to have a primitive specified.
+    if !info.is_transparent {
+        let _ = info.get_enum_primitive()?;
+    }
 
     if enum_is_fieldless(e) {
         repr_impl_for_fieldless_enum(def, e, info)

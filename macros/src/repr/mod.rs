@@ -44,7 +44,7 @@ impl Display for ReprDeriveError {
             Self::FieldEnumCannotSetValues => "Enum with fields cannot specify values for variants",
             Self::PackedEnum => "Rust does not support packed enums",
             Self::NonLifetimeGenericsNotSupported => "Non-lifetime generics are not supported",
-            Self::StructNeedsReprC => "Repr for structs needs repr(C)",
+            Self::StructNeedsReprC => "Repr for structs needs repr(C) or repr(transparent)",
             Self::NoReprForUnion => "Repr can't be derived for unions",
         };
         write!(f, "{}", msg)
@@ -115,7 +115,7 @@ mod test {
     #[test]
     fn test_struct_invalid_repr() {
         let s = quote! {
-            #[repr(transparent)]
+            #[repr(rust)]
             struct Foo;
         };
         assert!(has_err(do_derive(s), ReprDeriveError::UnexpectedRepr));

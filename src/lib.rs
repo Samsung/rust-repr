@@ -737,4 +737,55 @@ mod test {
             test_equal(&a_repr, &3u64, 6, true);
         }
     }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    enum TransparentEnum {
+        FOO(u32, (), ())
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    enum EmptyTransparentEnum {
+        FOO
+    }
+
+    #[test]
+    fn test_transparent_enum() {
+        let a = TransparentEnum::FOO(4, (), ());
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+        unsafe {
+            test_2_equal(&a, &a_repr, &4u32, 0); // Aligned enum start, tag
+        }
+
+        let a = EmptyTransparentEnum::FOO;
+        assert_eq!(size_of::<EmptyTransparentEnum>(), 0);
+        assert_eq!(align_of::<EmptyTransparentEnum>(), 1);
+        test_to_repr_and_back_is_id(a);
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    struct TransparentStruct(u32, (), ());
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    struct EmptyTransparentStruct;
+
+    #[test]
+    fn test_transparent_struct() {
+        let a = TransparentStruct(4, (), ());
+        test_to_repr_and_back_is_id(a);
+        let a_repr = to_repr(&a);
+        unsafe {
+            test_2_equal(&a, &a_repr, &4u32, 0); // Aligned enum start, tag
+        }
+
+        let a = EmptyTransparentStruct;
+        assert_eq!(size_of::<EmptyTransparentStruct>(), 0);
+        assert_eq!(align_of::<EmptyTransparentStruct>(), 1);
+        test_to_repr_and_back_is_id(a);
+    }
+
 }

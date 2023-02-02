@@ -5,11 +5,18 @@ use syn::spanned::Spanned;
 use syn::{Attribute, DeriveInput, Lit, LitInt, Meta, MetaList, NestedMeta};
 
 pub struct ReprInfo {
-    span: proc_macro2::Span,
+    pub span: proc_macro2::Span,
     pub is_c: bool,                   // True if there's "C" in repr.
     pub primitive: Option<syn::Path>, // The "u8" in e.g. repr(u8).
     pub align: Option<LitInt>,
     pub packed: Option<LitInt>,
+    // NOTE: As of 03.02.2023, Rustonomicon is outdated regarding transparent repr. These are the
+    // properties it doesn't talk about:
+    // * A transparent struct/enum can have zero non-ZST members.
+    // * A transparent struct/enum cannot (as of now) have ZSTs with alignment larger than 1. This
+    //   is very important, because it lets us generate the usual representations without fear that
+    //   a ZST member would force overly strict alignment.
+    pub is_transparent: bool,
 }
 
 impl ReprInfo {
@@ -20,6 +27,7 @@ impl ReprInfo {
             primitive: None,
             align: None,
             packed: None,
+            is_transparent: false,
         }
     }
 
@@ -48,12 +56,6 @@ impl ReprInfo {
         }
         self.packed = Some(a.clone());
         Ok(())
-    }
-    // TODO validate by enum / struct
-    pub fn get_enum_primitive(&self) -> syn::Result<&syn::Path> {
-        self.primitive
-            .as_ref()
-            .ok_or_else(|| syn::Error::new(self.span, ReprDeriveError::NoPrimForEnum))
     }
 }
 
@@ -87,6 +89,8 @@ fn extract_repr_info(l: &MetaList, info: &mut ReprInfo) -> syn::Result<()> {
                     info.is_c = true;
                 } else if p.is_ident("packed") {
                     info.set_packed(&LitInt::new("1", item.span()))?;
+                } else if p.is_ident("transparent") {
+                    info.is_transparent = true;
                 } else if is_primitive(p) {
                     info.set_primitive(p.clone())?;
                 } else {
