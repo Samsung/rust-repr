@@ -1,14 +1,11 @@
 use super::repr_type::ReprInfo;
-use super::repr_util::{
-    call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
-    repr_impl_statement, ReprInfoExt, unpack_fields, CRATE,
-};
+use super::repr_util::{repr_impl_statement, ItemStructExt, ReprInfoExt, CRATE};
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-use syn::DataStruct;
 use syn::DeriveInput;
+use syn::{DataStruct, ItemStruct};
 
 fn struct_repr_name(def: &DeriveInput) -> syn::Ident {
     format_ident!("{}Repr", def.ident)
@@ -16,9 +13,8 @@ fn struct_repr_name(def: &DeriveInput) -> syn::Ident {
 
 fn repr_struct(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStream {
     let repr_name = struct_repr_name(def);
-    let mut repr_fields = e.fields.clone();
-    convert_field_types_to_raw(&mut repr_fields);
-    let struct_def = fields_to_definition(&repr_name, repr_fields);
+    let mut struct_def = ItemStruct::from_fields(&repr_name, &e.fields.clone());
+    struct_def.convert_field_types_to_raw();
     let repr_attr = info.underlying_type_repr_attr();
 
     quote! {
@@ -35,8 +31,9 @@ fn impl_has_repr(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStr
 
     let unpack_by_value = info.packed.is_some();
     let maybe_deref = if unpack_by_value { quote!(*) } else { quote!() };
-    let unpacked = unpack_fields(&repr_name, &e.fields, !unpack_by_value, None);
-    let checks = call_fields_raw_is_valid(&e.fields, !unpack_by_value);
+    let struct_def = ItemStruct::from_fields(&repr_name, &e.fields);
+    let unpacked = struct_def.unpack(!unpack_by_value, None);
+    let checks = struct_def.call_fields_raw_is_valid(!unpack_by_value);
 
     quote! {
         unsafe #impl_hasrepr {

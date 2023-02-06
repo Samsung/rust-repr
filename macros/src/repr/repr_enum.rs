@@ -1,15 +1,13 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
-    call_fields_raw_is_valid, convert_field_types_to_raw, DataEnumExt, fields_to_definition,
-    repr_impl_statement, int_literal, prepend_field, ReprInfoExt,
-    unpack_fields, CRATE,
+    int_literal, repr_impl_statement, DataEnumExt, ItemStructExt, ReprInfoExt, CRATE,
 };
 /// Tools for deriving Repr for enums.
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-use syn::{DataEnum, DeriveInput};
+use syn::{DataEnum, DeriveInput, ItemStruct};
 
 trait EnumReprInfo {
     fn has_inner_tag(&self) -> bool;
@@ -53,11 +51,17 @@ impl EnumReprInfo for ReprInfo {
 struct GeneratedEnumVariant<'a> {
     v: &'a syn::Variant,
     info: &'a ReprInfo,
+    struct_def: ItemStruct,
 }
 
 impl<'a> GeneratedEnumVariant<'a> {
     fn new(v: &'a syn::Variant, info: &'a ReprInfo) -> Self {
-        Self { v, info }
+        let struct_def = ItemStruct::from_fields(&format_ident!("{}", v.ident), &v.fields);
+        Self {
+            v,
+            info,
+            struct_def,
+        }
     }
 
     fn type_name(&self) -> syn::Ident {
@@ -68,45 +72,41 @@ impl<'a> GeneratedEnumVariant<'a> {
         format_ident!("f_{}", self.v.ident)
     }
 
-    fn prepend_tag(&self, fields: &mut syn::Fields) {
-        prepend_field(
-            fields,
+    fn prepend_tag(&self, def: &mut ItemStruct) {
+        def.prepend_field(
             &self.info.tag_name(),
             &self.info.get_enum_primitive().unwrap(),
         );
     }
 
     fn repr_struct(&self) -> TokenStream {
-        let type_name = self.type_name();
-        let mut repr_fields = self.v.fields.clone();
-        convert_field_types_to_raw(&mut repr_fields);
+        let mut repr_struct = self.struct_def.clone();
+        repr_struct.convert_field_types_to_raw();
         if self.info.has_inner_tag() {
-            self.prepend_tag(&mut repr_fields);
+            self.prepend_tag(&mut repr_struct);
         }
-        let struct_def = fields_to_definition(&type_name, repr_fields);
         let target_repr = self.info.repr_c_or_transparent();
 
         quote! {
             #[repr(#target_repr)]
             #[derive(Clone, Copy, Debug)]
-            #struct_def
+            #repr_struct
         }
     }
 
     fn unpacked_self(&self) -> syn::Pat {
-        let mut repr_fields = self.v.fields.clone();
+        let mut repr_struct = self.struct_def.clone();
         let mut unpack_tag = None;
         if self.info.has_inner_tag() {
-            self.prepend_tag(&mut repr_fields);
+            self.prepend_tag(&mut repr_struct);
             unpack_tag = Some(self.info.tag_name());
         }
-        let type_name = self.type_name();
-        unpack_fields(&type_name, &repr_fields, true, unpack_tag)
+        repr_struct.unpack(true, unpack_tag)
     }
 
     fn members_are_repr_check(&self, ident_to_unpack: &syn::Ident) -> TokenStream {
         let unpacked_self = self.unpacked_self();
-        let checks = call_fields_raw_is_valid(&self.v.fields, true);
+        let checks = self.struct_def.call_fields_raw_is_valid(true);
         quote! {
             let #unpacked_self = #ident_to_unpack;
             #checks

@@ -74,47 +74,143 @@ impl DataEnumExt for DataEnum {
     }
 }
 
-// Unpack structs and tuples into variables <_0, _1, ...>.
-// Optionally assign a custom name to first variable, then start counting from 0.
-// The 'ref' argument controls whether the unpacked fields are references or copies. This is
-// relevant when unpacking a packed struct/enum.
-pub fn unpack_fields(
-    ty: &syn::Ident,
-    fields: &Fields,
-    ref_: bool,
-    first_name: Option<syn::Ident>,
-) -> syn::Pat {
-    let count = if first_name.is_some() {
-        fields.len() - 1
-    } else {
-        fields.len()
-    };
+trait ItemStructExtPriv {
+    fn statify_lifetimes(&mut self);
+    fn convert_field_types(&mut self, f: &mut dyn FnMut(TokenStream) -> TokenStream);
+}
 
-    let idents = first_name
-        .into_iter()
-        .chain((0..count).map(|i| format_ident!("_{}", i)));
+pub trait ItemStructExt: Sized {
+    fn from_fields(ty: &syn::Ident, fields: &Fields) -> Self;
+    fn unpack(&self, ref_: bool, first_name: Option<syn::Ident>) -> syn::Pat;
+    fn prepend_field(&mut self, id: &syn::Ident, ty: &syn::Path);
+    fn convert_field_types_to_repr(&mut self);
+    fn convert_field_types_to_raw(&mut self);
+    fn call_fields_raw_is_valid(&self, _ref: bool) -> TokenStream;
+}
 
-    let maybe_ref = if ref_ { quote!(ref) } else { quote!() };
+impl ItemStructExtPriv for syn::ItemStruct {
+    fn statify_lifetimes(&mut self) {
+        StatifyLifetimes.visit_item_struct_mut(self)
+    }
 
-    let raw = match fields {
-        Fields::Named(fs) => {
-            let fields = fs.named.iter().map(|i| i.ident.as_ref().unwrap());
-            quote! {
-                #ty { #(#fields: #maybe_ref #idents),* }
+    // Convert types of all fields to whatever's returned by f.
+    fn convert_field_types(&mut self, f: &mut dyn FnMut(TokenStream) -> TokenStream) {
+        let mut change_type = |fd: &mut syn::Field| {
+            let ty = &fd.ty;
+            fd.ty = syn::Type::Verbatim(f(quote! { #ty }));
+        };
+
+        match &mut self.fields {
+            Fields::Named(f) => {
+                for field in f.named.iter_mut() {
+                    change_type(field);
+                }
+            }
+            Fields::Unnamed(f) => {
+                for field in f.unnamed.iter_mut() {
+                    change_type(field);
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+impl ItemStructExt for syn::ItemStruct {
+    fn from_fields(ty: &syn::Ident, fields: &Fields) -> Self {
+        let delim = match fields {
+            Fields::Named(_) => quote! {},
+            _ => quote! {;},
+        };
+        syn::parse2(quote! { struct #ty #fields #delim }).unwrap()
+    }
+
+    // Unpack structs and tuples into variables <_0, _1, ...>.
+    // Optionally assign a custom name to first variable, then start counting from 0.
+    // The 'ref' argument controls whether the unpacked fields are references or copies. This is
+    // relevant when unpacking a packed struct/enum.
+    fn unpack(&self, ref_: bool, first_name: Option<syn::Ident>) -> syn::Pat {
+        let count = if first_name.is_some() {
+            self.fields.len() - 1
+        } else {
+            self.fields.len()
+        };
+
+        let idents = first_name
+            .into_iter()
+            .chain((0..count).map(|i| format_ident!("_{}", i)));
+
+        let maybe_ref = if ref_ { quote!(ref) } else { quote!() };
+        let ty = &self.ident;
+        let fields = &self.fields;
+
+        let raw = match fields {
+            Fields::Named(fs) => {
+                let fields = fs.named.iter().map(|i| i.ident.as_ref().unwrap());
+                quote! {
+                    #ty { #(#fields: #maybe_ref #idents),* }
+                }
+            }
+            Fields::Unnamed(_) => {
+                quote! { #ty (#(#maybe_ref #idents),*) }
+            }
+            _ => quote! { #ty },
+        };
+        syn::parse2(raw).unwrap()
+    }
+
+    // Prepend a field to a list of fields.
+    fn prepend_field(&mut self, id: &syn::Ident, ty: &syn::Path) {
+        // Everything parsed here should be valid.
+        match &mut self.fields {
+            Fields::Named(fs) => {
+                fs.named.insert(
+                    0,
+                    syn::Field::parse_named.parse2(quote! { #id: #ty }).unwrap(),
+                );
+            }
+            Fields::Unnamed(fs) => {
+                fs.unnamed
+                    .insert(0, syn::Field::parse_unnamed.parse2(quote! { #ty }).unwrap());
+            }
+            Fields::Unit => {
+                let f: syn::FieldsUnnamed = syn::parse_quote! { (#ty) };
+                self.fields = f.into();
             }
         }
-        Fields::Unnamed(_) => {
-            quote! { #ty (#(#maybe_ref #idents),*) }
+    }
+
+    fn convert_field_types_to_repr(&mut self) {
+        self.convert_field_types(&mut |ty| quote! { <#ty as #CRATE::HasRepr> })
+    }
+
+    // Also converts lifetimes to static, since Raw types should stay the same.
+    fn convert_field_types_to_raw(&mut self) {
+        self.statify_lifetimes();
+        self.convert_field_types(&mut |ty| quote! { <#ty as #CRATE::HasRepr>::Raw })
+    }
+
+    // Call raw_is_valid for unpacked fields <_0, _1, ...>.
+    // _ref specifies whether the fields are references or not.
+    fn call_fields_raw_is_valid(&self, _ref: bool) -> TokenStream {
+        let mut fd = self.clone();
+        fd.statify_lifetimes();
+        fd.convert_field_types_to_repr();
+        let fd = fd.fields;
+
+        let maybe_ref = if _ref { quote!() } else { quote!(&) };
+
+        let idents = (0..fd.len()).map(|i| format_ident!("_{}", i));
+        let types = fd.iter().map(|f| &f.ty);
+        quote! {
+            #(#types::raw_is_valid(#maybe_ref #idents)?;)*
         }
-        _ => quote! { #ty },
-    };
-    syn::parse2(raw).unwrap()
+    }
 }
 
 #[cfg(test)]
 #[test]
 fn test_unpack_fields() {
-    let ident = format_ident!("Foo");
     for (s, ref_, first_name, expect) in [
         (
             "struct Foo(bool, u64, u8);",
@@ -150,29 +246,8 @@ fn test_unpack_fields() {
     ] {
         let f: syn::ItemStruct = syn::parse_str(s).unwrap();
         let expect: syn::Pat = syn::parse_str(expect).unwrap();
-        let pat = unpack_fields(&ident, &f.fields, ref_, first_name);
+        let pat = f.unpack(ref_, first_name);
         assert_eq!(pat, expect);
-    }
-}
-
-// Prepend a field to a list of fields.
-pub fn prepend_field(fields: &mut Fields, id: &syn::Ident, ty: &syn::Path) {
-    // Everything parsed here should be valid.
-    match fields {
-        Fields::Named(fs) => {
-            fs.named.insert(
-                0,
-                syn::Field::parse_named.parse2(quote! { #id: #ty }).unwrap(),
-            );
-        }
-        Fields::Unnamed(fs) => {
-            fs.unnamed
-                .insert(0, syn::Field::parse_unnamed.parse2(quote! { #ty }).unwrap());
-        }
-        Fields::Unit => {
-            let f: syn::FieldsUnnamed = syn::parse_quote! { (#ty) };
-            *fields = f.into();
-        }
     }
 }
 
@@ -194,18 +269,9 @@ fn test_prepend_field() {
     ] {
         let mut f: syn::ItemStruct = syn::parse_str(s).unwrap();
         let expect: syn::ItemStruct = syn::parse_str(expect).unwrap();
-        prepend_field(&mut f.fields, &ident, &ty);
+        f.prepend_field(&ident, &ty);
         assert!(f == expect);
     }
-}
-
-// Turn a fields struct into struct / enum definition, with a semicolon if needed.
-pub fn fields_to_definition(name: &syn::Ident, fields: Fields) -> syn::ItemStruct {
-    let delim = match fields {
-        Fields::Named(_) => quote! {},
-        _ => quote! {;},
-    };
-    syn::parse2(quote! { struct #name #fields #delim }).unwrap()
 }
 
 // Turn usize into int literal without suffix.
@@ -213,78 +279,11 @@ pub fn int_literal(lit: usize, span: proc_macro2::Span) -> syn::Lit {
     syn::LitInt::new(&lit.to_string(), span).into()
 }
 
-// Convert types of all fields to whatever's returned by f.
-fn convert_field_types(fields: &mut Fields, f: &mut dyn FnMut(TokenStream) -> TokenStream) {
-    let mut make_repr = |fd: &mut syn::Field| {
-        let ty = &fd.ty;
-        fd.ty = syn::Type::Verbatim(f(quote! { #ty }));
-    };
-
-    match fields {
-        Fields::Named(f) => {
-            for field in f.named.iter_mut() {
-                make_repr(field);
-            }
-        }
-        Fields::Unnamed(f) => {
-            for field in f.unnamed.iter_mut() {
-                make_repr(field);
-            }
-        }
-        _ => (),
-    }
-}
-
-pub fn convert_field_types_to_repr(fields: &mut Fields) {
-    let mut conv = |ty| quote! { <#ty as #CRATE::HasRepr> };
-    convert_field_types(fields, &mut conv)
-}
-
-// Also converts lifetimes to static, since Raw types should stay the same.
-pub fn convert_field_types_to_raw(fields: &mut Fields) {
-    let mut conv = |ty| quote! { <#ty as #CRATE::HasRepr>::Raw };
-    statify_lifetimes(fields);
-    convert_field_types(fields, &mut conv)
-}
-
-// Call raw_is_valid for unpacked fields <_0, _1, ...>.
-// _ref specifies whether the fields are references or not.
-pub fn call_fields_raw_is_valid(fields: &Fields, _ref: bool) -> TokenStream {
-    let mut fd = fields.clone();
-    statify_lifetimes(&mut fd);
-    convert_field_types_to_repr(&mut fd);
-
-    let maybe_ref = if _ref { quote!() } else { quote!(&) };
-
-    let idents = (0..fields.len()).map(|i| format_ident!("_{}", i));
-    let types = fd.iter().map(|f| &f.ty);
-    quote! {
-        #(#types::raw_is_valid(#maybe_ref #idents)?;)*
-    }
-}
-
 pub struct StatifyLifetimes;
 impl syn::visit_mut::VisitMut for StatifyLifetimes {
     fn visit_lifetime_mut(&mut self, l: &mut syn::Lifetime) {
         l.ident = syn::Ident::new("static", Span::call_site());
         syn::visit_mut::visit_lifetime_mut(self, l)
-    }
-}
-
-fn statify_lifetimes(f: &mut Fields) {
-    StatifyLifetimes.visit_fields_mut(f)
-}
-
-// Generate a repr impl statement, taking into account generics.
-pub fn repr_impl_statement(def: &DeriveInput) -> TokenStream {
-    let ident = &def.ident;
-
-    if def.generics.params.is_empty() {
-        quote! { impl #CRATE::HasRepr for #ident }
-    } else {
-        let generics = &def.generics.params;
-        let where_clause = &def.generics.where_clause;
-        quote! { impl<#generics> #CRATE::HasRepr for #ident<#generics> #where_clause }
     }
 }
 
@@ -308,5 +307,18 @@ impl ReprInfoExt for ReprInfo {
             repr_items.push(quote!(packed(#a)));
         }
         quote!(#[repr(#(#repr_items),*)])
+    }
+}
+
+// Generate a repr impl statement, taking into account generics.
+pub fn repr_impl_statement(def: &DeriveInput) -> TokenStream {
+    let ident = &def.ident;
+
+    if def.generics.params.is_empty() {
+        quote! { impl #CRATE::HasRepr for #ident }
+    } else {
+        let generics = &def.generics.params;
+        let where_clause = &def.generics.where_clause;
+        quote! { impl<#generics> #CRATE::HasRepr for #ident<#generics> #where_clause }
     }
 }
