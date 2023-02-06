@@ -155,7 +155,7 @@ mod test {
                 #[repr(C)]
                 #[repr(align(8))]
                 struct Foobar;
-            }
+            },
         ];
 
         for f in formats {

@@ -62,16 +62,10 @@ pub fn do_derive(input: TokenStream) -> syn::Result<TokenStream> {
 
     let info = get_repr_type(&d)?;
 
-    if info.packed.is_some() {
-    }
-
     match &d.data {
         syn::Data::Enum(e) => {
             if info.packed.is_some() {
-                return Err(syn::Error::new(
-                    d.span(),
-                    ReprDeriveError::PackedEnum,
-                ));
+                return Err(syn::Error::new(d.span(), ReprDeriveError::PackedEnum));
             };
             repr_impl_for_enum(&d, e, &info)
         }

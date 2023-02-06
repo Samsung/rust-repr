@@ -1,6 +1,6 @@
 //! Various macro utilities.
 
-use super::{ReprDeriveError, repr_type::ReprInfo};
+use super::{repr_type::ReprInfo, ReprDeriveError};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse::Parser, spanned::Spanned, visit_mut::VisitMut, DataEnum, DeriveInput, Fields};
@@ -77,7 +77,12 @@ pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
 // Optionally assign a custom name to first variable, then start counting from 0.
 // The 'ref' argument controls whether the unpacked fields are references or copies. This is
 // relevant when unpacking a packed struct/enum.
-pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, ref_: bool, first_name: Option<syn::Ident>) -> syn::Pat {
+pub fn unpack_fields(
+    ty: &syn::Ident,
+    fields: &Fields,
+    ref_: bool,
+    first_name: Option<syn::Ident>,
+) -> syn::Pat {
     let count = if first_name.is_some() {
         fields.len() - 1
     } else {
@@ -88,11 +93,7 @@ pub fn unpack_fields(ty: &syn::Ident, fields: &Fields, ref_: bool, first_name: O
         .into_iter()
         .chain((0..count).map(|i| format_ident!("_{}", i)));
 
-    let maybe_ref = if ref_ {
-        quote!(ref)
-    } else {
-        quote!()
-    };
+    let maybe_ref = if ref_ { quote!(ref) } else { quote!() };
 
     let raw = match fields {
         Fields::Named(fs) => {
@@ -252,11 +253,7 @@ pub fn call_fields_raw_is_valid(fields: &Fields, _ref: bool) -> TokenStream {
     statify_lifetimes(&mut fd);
     convert_field_types_to_repr(&mut fd);
 
-    let maybe_ref = if _ref {
-        quote!()
-    } else {
-        quote!(&)
-    };
+    let maybe_ref = if _ref { quote!() } else { quote!(&) };
 
     let idents = (0..fields.len()).map(|i| format_ident!("_{}", i));
     let types = fd.iter().map(|f| &f.ty);
@@ -300,7 +297,13 @@ pub fn impl_statement(def: &DeriveInput, impl_: TokenStream, for_: TokenStream) 
 }
 
 pub fn underlying_type_repr_attr(info: &ReprInfo) -> TokenStream {
-    let mut repr_items: Vec<TokenStream> = vec![quote!(C)];
+    let mut repr_items: Vec<TokenStream> = vec![];
+    if info.is_transparent {
+        repr_items.push(quote!(transparent));
+    } else {
+        repr_items.push(quote!(C));
+    }
+
     if let Some(a) = &info.align {
         repr_items.push(quote!(align(#a)));
     }

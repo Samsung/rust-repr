@@ -1,7 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
-    ident_with_generics, impl_statement, unpack_fields, CRATE, underlying_type_repr_attr,
+    ident_with_generics, impl_statement, underlying_type_repr_attr, unpack_fields, CRATE,
 };
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
@@ -35,11 +35,7 @@ fn impl_has_repr(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStr
     let impl_hasrepr = impl_statement(def, quote! { #CRATE::HasRepr }, quote! { #e_ident });
 
     let unpack_by_value = info.packed.is_some();
-    let maybe_deref = if unpack_by_value {
-        quote!(*)
-    } else {
-        quote!()
-    };
+    let maybe_deref = if unpack_by_value { quote!(*) } else { quote!() };
     let unpacked = unpack_fields(&repr_name, &e.fields, !unpack_by_value, None);
     let checks = call_fields_raw_is_valid(&e.fields, !unpack_by_value);
 
