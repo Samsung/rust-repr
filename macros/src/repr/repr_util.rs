@@ -213,7 +213,7 @@ pub fn int_literal(lit: usize, span: proc_macro2::Span) -> syn::Lit {
 }
 
 // Convert types of all fields to whatever's returned by f.
-pub fn convert_field_types(fields: &mut Fields, f: &mut dyn FnMut(TokenStream) -> TokenStream) {
+fn convert_field_types(fields: &mut Fields, f: &mut dyn FnMut(TokenStream) -> TokenStream) {
     let mut make_repr = |fd: &mut syn::Field| {
         let ty = &fd.ty;
         fd.ty = syn::Type::Verbatim(f(quote! { #ty }));
@@ -274,25 +274,16 @@ pub fn statify_lifetimes(f: &mut Fields) {
     StatifyLifetimes.visit_fields_mut(f)
 }
 
-pub fn ident_with_generics(def: &DeriveInput) -> TokenStream {
-    let generics = if def.generics.params.is_empty() {
-        quote! {}
-    } else {
-        let generics = &def.generics.params;
-        quote! { <#generics> }
-    };
+// Generate a repr impl statement, taking into account generics.
+pub fn repr_impl_statement(def: &DeriveInput) -> TokenStream {
     let ident = &def.ident;
-    quote! { #ident #generics }
-}
 
-// Generate an impl statement, taking into account generics.
-pub fn impl_statement(def: &DeriveInput, impl_: TokenStream, for_: TokenStream) -> TokenStream {
     if def.generics.params.is_empty() {
-        quote! { impl #impl_ for #for_ }
+        quote! { impl #CRATE::HasRepr for #ident }
     } else {
         let generics = &def.generics.params;
         let where_clause = &def.generics.where_clause;
-        quote! { impl<#generics> #impl_ for #for_ #where_clause }
+        quote! { impl<#generics> #CRATE::HasRepr for #ident<#generics> #where_clause }
     }
 }
 

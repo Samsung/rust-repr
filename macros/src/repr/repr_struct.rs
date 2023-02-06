@@ -1,7 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
-    ident_with_generics, impl_statement, underlying_type_repr_attr, unpack_fields, CRATE,
+    repr_impl_statement, underlying_type_repr_attr, unpack_fields, CRATE,
 };
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
@@ -30,9 +30,8 @@ fn repr_struct(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStrea
 }
 
 fn impl_has_repr(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStream {
-    let e_ident = ident_with_generics(def);
     let repr_name = struct_repr_name(def);
-    let impl_hasrepr = impl_statement(def, quote! { #CRATE::HasRepr }, quote! { #e_ident });
+    let impl_hasrepr = repr_impl_statement(def);
 
     let unpack_by_value = info.packed.is_some();
     let maybe_deref = if unpack_by_value { quote!(*) } else { quote!() };

@@ -2,7 +2,7 @@ use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, enum_is_empty, enum_is_fieldless,
     enum_should_have_all_discriminants, enum_should_have_no_discriminants, fields_to_definition,
-    ident_with_generics, impl_statement, int_literal, prepend_field, underlying_type_repr_attr,
+    repr_impl_statement, int_literal, prepend_field, underlying_type_repr_attr,
     unpack_fields, CRATE,
 };
 /// Tools for deriving Repr for enums.
@@ -310,10 +310,8 @@ impl<'a> GeneratedEnum<'a> {
             }
         };
 
-        let e_ident = ident_with_generics(self.def);
         let repr_name = self.enum_repr_name();
-        let impl_hasrepr =
-            impl_statement(self.def, quote! { #CRATE::HasRepr }, quote! { #e_ident });
+        let impl_hasrepr = repr_impl_statement(self.def);
         quote! {
             unsafe #impl_hasrepr {
                 type Raw = #repr_name;
