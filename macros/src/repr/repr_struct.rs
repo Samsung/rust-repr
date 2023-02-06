@@ -1,7 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
     call_fields_raw_is_valid, convert_field_types_to_raw, fields_to_definition,
-    repr_impl_statement, underlying_type_repr_attr, unpack_fields, CRATE,
+    repr_impl_statement, ReprInfoExt, unpack_fields, CRATE,
 };
 use super::ReprDeriveError;
 use proc_macro2::TokenStream;
@@ -19,7 +19,7 @@ fn repr_struct(def: &DeriveInput, e: &DataStruct, info: &ReprInfo) -> TokenStrea
     let mut repr_fields = e.fields.clone();
     convert_field_types_to_raw(&mut repr_fields);
     let struct_def = fields_to_definition(&repr_name, repr_fields);
-    let repr_attr = underlying_type_repr_attr(info);
+    let repr_attr = info.underlying_type_repr_attr();
 
     quote! {
         #repr_attr

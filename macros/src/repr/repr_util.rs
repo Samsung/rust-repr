@@ -38,39 +38,40 @@ fn test_def_has_non_lifetime_generics() {
     }
 }
 
-// Enum utilities.
-pub fn enum_is_empty(e: &DataEnum) -> bool {
-    e.variants.iter().next().is_none()
+pub trait DataEnumExt {
+    fn is_empty(&self) -> bool;
+    fn is_fieldless(&self) -> bool;
+    fn check_specifies_discriminants_like_repr_wants(&self, info: &ReprInfo) -> syn::Result<()>;
 }
 
-pub fn enum_is_fieldless(e: &DataEnum) -> bool {
-    e.variants
-        .iter()
-        .all(|v| matches!(v.fields, syn::Fields::Unit))
-}
-
-pub fn enum_should_have_all_discriminants(e: &DataEnum) -> syn::Result<()> {
-    for v in e.variants.iter() {
-        if v.discriminant.is_none() {
-            return Err(syn::Error::new(
-                v.span(),
-                ReprDeriveError::FieldlessEnumNeedsAllValues,
-            ));
-        }
+impl DataEnumExt for DataEnum {
+    fn is_empty(&self) -> bool {
+        self.variants.iter().next().is_none()
     }
-    Ok(())
-}
 
-pub fn enum_should_have_no_discriminants(e: &DataEnum) -> syn::Result<()> {
-    for v in e.variants.iter() {
-        if v.discriminant.is_some() {
-            return Err(syn::Error::new(
-                v.span(),
-                ReprDeriveError::FieldEnumCannotSetValues,
-            ));
-        }
+    fn is_fieldless(&self) -> bool {
+        self.variants
+            .iter()
+            .all(|v| matches!(v.fields, syn::Fields::Unit))
     }
-    Ok(())
+
+    fn check_specifies_discriminants_like_repr_wants(&self, info: &ReprInfo) -> syn::Result<()> {
+        if info.is_transparent {
+            // repr(transparent) will complain for us
+            return Ok(());
+        }
+
+        let is_fieldless = self.is_fieldless();
+        let err = |v: &syn::Variant, e| syn::Error::new(v.span(), e);
+        for v in self.variants.iter() {
+            if is_fieldless && v.discriminant.is_none() {
+                return Err(err(v, ReprDeriveError::FieldlessEnumNeedsAllValues));
+            } else if !is_fieldless && v.discriminant.is_some() {
+                return Err(err(v, ReprDeriveError::FieldEnumCannotSetValues));
+            }
+        }
+        Ok(())
+    }
 }
 
 // Unpack structs and tuples into variables <_0, _1, ...>.
@@ -270,7 +271,7 @@ impl syn::visit_mut::VisitMut for StatifyLifetimes {
     }
 }
 
-pub fn statify_lifetimes(f: &mut Fields) {
+fn statify_lifetimes(f: &mut Fields) {
     StatifyLifetimes.visit_fields_mut(f)
 }
 
@@ -287,19 +288,25 @@ pub fn repr_impl_statement(def: &DeriveInput) -> TokenStream {
     }
 }
 
-pub fn underlying_type_repr_attr(info: &ReprInfo) -> TokenStream {
-    let mut repr_items: Vec<TokenStream> = vec![];
-    if info.is_transparent {
-        repr_items.push(quote!(transparent));
-    } else {
-        repr_items.push(quote!(C));
-    }
+pub trait ReprInfoExt {
+    fn underlying_type_repr_attr(&self) -> TokenStream;
+}
 
-    if let Some(a) = &info.align {
-        repr_items.push(quote!(align(#a)));
+impl ReprInfoExt for ReprInfo {
+    fn underlying_type_repr_attr(&self) -> TokenStream {
+        let mut repr_items: Vec<TokenStream> = vec![];
+        if self.is_transparent {
+            repr_items.push(quote!(transparent));
+        } else {
+            repr_items.push(quote!(C));
+        }
+
+        if let Some(a) = &self.align {
+            repr_items.push(quote!(align(#a)));
+        }
+        if let Some(a) = &self.packed {
+            repr_items.push(quote!(packed(#a)));
+        }
+        quote!(#[repr(#(#repr_items),*)])
     }
-    if let Some(a) = &info.packed {
-        repr_items.push(quote!(packed(#a)));
-    }
-    quote!(#[repr(#(#repr_items),*)])
 }

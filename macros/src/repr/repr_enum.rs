@@ -1,8 +1,7 @@
 use super::repr_type::ReprInfo;
 use super::repr_util::{
-    call_fields_raw_is_valid, convert_field_types_to_raw, enum_is_empty, enum_is_fieldless,
-    enum_should_have_all_discriminants, enum_should_have_no_discriminants, fields_to_definition,
-    repr_impl_statement, int_literal, prepend_field, underlying_type_repr_attr,
+    call_fields_raw_is_valid, convert_field_types_to_raw, DataEnumExt, fields_to_definition,
+    repr_impl_statement, int_literal, prepend_field, ReprInfoExt,
     unpack_fields, CRATE,
 };
 /// Tools for deriving Repr for enums.
@@ -117,7 +116,6 @@ impl<'a> GeneratedEnumVariant<'a> {
 
 struct GeneratedEnum<'a> {
     def: &'a DeriveInput,
-    e: &'a DataEnum,
     info: &'a ReprInfo,
     variants: Vec<GeneratedEnumVariant<'a>>,
 }
@@ -131,7 +129,6 @@ impl<'a> GeneratedEnum<'a> {
             .collect();
         Self {
             def,
-            e,
             info,
             variants,
         }
@@ -169,11 +166,6 @@ impl<'a> GeneratedEnum<'a> {
     // First, the easy case. No generics, since enum is fieldless.
     pub fn repr_impl_for_fieldless_enum(&self) -> syn::Result<TokenStream> {
         let prim = self.primitive_type()?;
-
-        if !self.info.is_transparent {
-            enum_should_have_all_discriminants(self.e)?;
-        }
-
         let e_ident = &self.type_name();
 
         let validation_block = if self.info.is_transparent {
@@ -202,7 +194,7 @@ impl<'a> GeneratedEnum<'a> {
     }
 
     fn repr_structs(&self) -> TokenStream {
-        let repr_attr = underlying_type_repr_attr(self.info);
+        let repr_attr = self.info.underlying_type_repr_attr();
         let repr_name = self.enum_repr_name();
         let union_name = self.union_repr_name();
         let structs = self.variants.iter().map(|v| v.repr_struct());
@@ -353,7 +345,6 @@ impl<'a> GeneratedEnum<'a> {
 
     fn repr_impl_for_enum_with_fields(&self) -> syn::Result<TokenStream> {
         // There are unstable extensions that allow setting values. Let's explicitly disallow that.
-        enum_should_have_no_discriminants(self.e)?;
         let structs = self.repr_structs();
         let impls = self.impl_repr_structs();
 
@@ -382,15 +373,16 @@ pub fn repr_impl_for_enum(
     e: &DataEnum,
     info: &ReprInfo,
 ) -> syn::Result<TokenStream> {
-    if enum_is_empty(e) {
+    if e.is_empty() {
         return Err(syn::Error::new(def.span(), ReprDeriveError::EnumIsEmpty));
     }
     // If enum is transparent, it's allowed not to have a primitive specified.
     if !info.is_transparent {
         let _ = info.get_enum_primitive()?;
     }
+    e.check_specifies_discriminants_like_repr_wants(&info)?;
 
-    if enum_is_fieldless(e) {
+    if e.is_fieldless() {
         GeneratedEnum::new(def, e, info).repr_impl_for_fieldless_enum()
     } else {
         GeneratedEnum::new(def, e, info).repr_impl_for_enum_with_fields()

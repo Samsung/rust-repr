@@ -741,13 +741,13 @@ mod test {
     #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
     #[repr(transparent)]
     enum TransparentEnum {
-        FOO(u32, (), ())
+        FOO(u32, (), ()),
     }
 
     #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
     #[repr(transparent)]
     enum EmptyTransparentEnum {
-        FOO
+        FOO,
     }
 
     #[test]
@@ -787,5 +787,4 @@ mod test {
         assert_eq!(align_of::<EmptyTransparentStruct>(), 1);
         test_to_repr_and_back_is_id(a);
     }
-
 }
