@@ -198,6 +198,9 @@ extern crate self as repr;
 
 #[cfg(test)]
 mod test {
+    extern crate alloc;
+    use alloc::format;
+
     use crate::{
         traits::{HasRepr, Repr, ReprError},
         IsRepr,
@@ -303,6 +306,17 @@ mod test {
         ] {
             test_to_repr_and_back_is_id(*value);
         }
+    }
+
+    #[test]
+    fn test_value_enum_with_values_debug() {
+        let value = Values::Tuple(5, 10);
+        let mut value_repr: Repr<Values> = to_repr(&value);
+        assert_eq!(format!("{:?}", value_repr), "Repr(ValuesRepr { _repr_tag: 1, f_Tuple: Tuple(5, 10) })");
+
+        let repr_ptr = &mut value_repr as *mut Repr<Values> as *mut u8;
+        unsafe { core::ptr::write(repr_ptr, 3) };
+        assert_eq!(format!("{:?}", value_repr), "Repr(ValuesRepr { _repr_tag: 3 })");
     }
 
     #[test]
