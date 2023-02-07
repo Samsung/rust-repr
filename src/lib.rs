@@ -249,60 +249,204 @@ mod test {
         test_equal(s2, m, offset, false);
     }
 
+    // Start with struct definitions.
+
     #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
     #[repr(u8)]
-    enum Foobar {
+    enum ValuelessEnum {
         FOO = 5,
         BAR = 10,
-    }
-
-    #[test]
-    fn test_value_enum_basic() {
-        assert_eq!(Foobar::try_from_raw(8), Err(ReprError));
-        assert_eq!(
-            Foobar::try_from_repr(<Repr<Foobar>>::from_raw(5)),
-            Ok(Foobar::FOO)
-        );
-    }
-
-    #[test]
-    fn test_value_enum_ref() {
-        let mut base_val = <Repr<Foobar>>::from_raw(5);
-        let foo = Foobar::try_from_ref(&base_val).unwrap();
-        assert_eq!(*foo, Foobar::FOO);
-
-        let foo = Foobar::try_from_mut(&mut base_val).unwrap();
-        assert_eq!(*foo, Foobar::FOO);
-
-        *foo = Foobar::BAR;
-
-        assert_eq!(base_val.repr_try_into().unwrap(), Foobar::BAR);
-    }
-
-    #[test]
-    fn test_value_enum_param() {
-        fn inner(repr: Repr<Foobar>) -> Result<Foobar, ReprError> {
-            repr.repr_try_into()
-        }
-
-        assert_eq!(inner(<Repr<Foobar>>::from_raw(10)), Ok(Foobar::BAR));
     }
 
     #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
     #[repr(C, u8)]
     // 'pub' tests if we export repr type properly.
-    pub enum Values {
+    pub enum EnumWithValues {
         Unit,
         Tuple(u64, u64),
-        Struct { x: u32, y: u32 },
+        Struct { x: u32, y: u32, z: u32 },
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, u8)]
+    enum CEnumWithValues {
+        Unit,
+        Tuple(u64, u64),
+        Struct { x: u32, y: u32, z: u32 },
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct Struct {
+        x: u8,
+        y: u32,
+        z: u64,
+        t: u64,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, u8)]
+    enum EnumWithBoolAndArray {
+        Bool(bool),
+        Array([bool; 7]),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    enum NestedReprInner {
+        Unit(u8),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct NestedReprOuter {
+        x: u8,
+        inner: NestedReprInner,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct StructWithLifetime<'a> {
+        x: u8,
+        p: PhantomData<&'a u8>,
+    }
+
+    #[derive(IsRepr)]
+    #[repr(C)]
+    struct NestedLifetimeInner<'a>(PhantomData<&'a u8>);
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct NestedLifetimeOuter<'a>(*const Repr<NestedLifetimeInner<'a>>);
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, align(16))]
+    struct Aligned16Inner {
+        x: u32,
+        y: u32,
+        z: u32,
+        t: u32,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, align(16))]
+    struct Aligned16Outer {
+        foo: u32,
+        bar: Aligned16Inner,
+    }
+
+    // Aligned enum behaves as if it was wrapped in a newtype struct with the specified alignment.
+    // That is, its contents are unaffected by align, only its alignment as a whole.
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(u8, align(4))]
+    #[allow(dead_code)]
+    enum Aligned4Enum {
+        Bar,
+        Foo(u8),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct StructWithAligned4Enum {
+        foo: u8,
+        bar: Aligned4Enum,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, u8, align(4))]
+    #[allow(dead_code)]
+    enum CAligned4Enum {
+        Bar(u16),
+        Foo(u8),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    struct StructWithCAligned4Enum {
+        foo: u8,
+        bar: CAligned4Enum,
+    }
+
+    // Packed enums are disallowed in Rust.
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, packed)]
+    struct Packed {
+        foo: u8,
+        bar: u32,
+        baz: u64,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(C, packed(2))]
+    struct Packed2 {
+        foo: u8,
+        bar: u32,
+        baz: u64,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    enum TransparentEnum {
+        FOO(u32, (), ()),
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    enum EmptyTransparentEnum {
+        FOO,
+    }
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    struct TransparentStruct(u32, (), ());
+
+    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(transparent)]
+    struct EmptyTransparentStruct;
+
+    // Start by testing the basics: layout, conversion to/from being identity, invalid values.
+
+    #[test]
+    fn test_value_enum_basic() {
+        assert_eq!(ValuelessEnum::try_from_raw(8), Err(ReprError));
+        assert_eq!(
+            ValuelessEnum::try_from_repr(<Repr<ValuelessEnum>>::from_raw(5)),
+            Ok(ValuelessEnum::FOO)
+        );
+    }
+
+    #[test]
+    fn test_value_enum_ref() {
+        let mut base_val = <Repr<ValuelessEnum>>::from_raw(5);
+        let foo = ValuelessEnum::try_from_ref(&base_val).unwrap();
+        assert_eq!(*foo, ValuelessEnum::FOO);
+
+        let foo = ValuelessEnum::try_from_mut(&mut base_val).unwrap();
+        assert_eq!(*foo, ValuelessEnum::FOO);
+
+        *foo = ValuelessEnum::BAR;
+
+        assert_eq!(base_val.repr_try_into().unwrap(), ValuelessEnum::BAR);
+    }
+
+    #[test]
+    fn test_value_enum_param() {
+        fn inner(repr: Repr<ValuelessEnum>) -> Result<ValuelessEnum, ReprError> {
+            repr.repr_try_into()
+        }
+
+        assert_eq!(
+            inner(<Repr<ValuelessEnum>>::from_raw(10)),
+            Ok(ValuelessEnum::BAR)
+        );
     }
 
     #[test]
     fn test_value_enum_with_values() {
         for value in &[
-            Values::Unit,
-            Values::Tuple(5, 10),
-            Values::Struct { x: 1, y: 2 },
+            EnumWithValues::Unit,
+            EnumWithValues::Tuple(5, 10),
+            EnumWithValues::Struct { x: 1, y: 2, z: 3 },
         ] {
             test_to_repr_and_back_is_id(*value);
         }
@@ -310,66 +454,71 @@ mod test {
 
     #[test]
     fn test_value_enum_with_values_debug() {
-        let value = Values::Tuple(5, 10);
-        let mut value_repr: Repr<Values> = to_repr(&value);
-        assert_eq!(format!("{:?}", value_repr), "Repr(ValuesRepr { _repr_tag: 1, f_Tuple: Tuple(5, 10) })");
+        let value = EnumWithValues::Tuple(5, 10);
+        let mut value_repr: Repr<EnumWithValues> = to_repr(&value);
+        assert_eq!(
+            format!("{:?}", value_repr),
+            "Repr(ValuesRepr { _repr_tag: 1, f_Tuple: Tuple(5, 10) })"
+        );
 
-        let repr_ptr = &mut value_repr as *mut Repr<Values> as *mut u8;
+        let repr_ptr = &mut value_repr as *mut Repr<EnumWithValues> as *mut u8;
         unsafe { core::ptr::write(repr_ptr, 3) };
-        assert_eq!(format!("{:?}", value_repr), "Repr(ValuesRepr { _repr_tag: 3 })");
+        assert_eq!(
+            format!("{:?}", value_repr),
+            "Repr(ValuesRepr { _repr_tag: 3 })"
+        );
+
+        let value = EnumWithValues::Struct { x: 1, y: 2, z: 3 };
+        let value_repr: Repr<EnumWithValues> = to_repr(&value);
+        assert_eq!(
+            format!("{:?}", value_repr),
+            "Repr(ValuesRepr { _repr_tag: 2, f_Struct: Struct { x: 1, y: 2, z: 3 } })"
+        );
     }
 
     #[test]
     fn test_invalid_enum_repr() {
-        let value = Values::Tuple(5, 10);
-        let mut value_repr: Repr<Values> = to_repr(&value);
-        let repr_ptr = &mut value_repr as *mut Repr<Values> as *mut u8;
+        let value = EnumWithValues::Tuple(5, 10);
+        let mut value_repr: Repr<EnumWithValues> = to_repr(&value);
+        let repr_ptr = &mut value_repr as *mut Repr<EnumWithValues> as *mut u8;
         unsafe { core::ptr::write(repr_ptr, 3) };
-        Values::try_from_repr(value_repr).unwrap_err();
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, u8)]
-    enum EnumC {
-        Unit,
-        Tuple(u64),
-        Struct { x: u32, y: u32, z: u32 },
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(u8)]
-    enum EnumNoC {
-        Unit,
-        Tuple(u64),
-        Struct { x: u32, y: u32, z: u32 },
+        EnumWithValues::try_from_repr(value_repr).unwrap_err();
     }
 
     #[test]
     fn test_c_enum_repr_layout_matches() {
-        assert_eq!(size_of::<EnumC>(), size_of::<Repr<EnumC>>());
-        assert_eq!(align_of::<EnumC>(), align_of::<Repr<EnumC>>());
+        assert_eq!(
+            size_of::<CEnumWithValues>(),
+            size_of::<Repr<CEnumWithValues>>()
+        );
+        assert_eq!(
+            align_of::<CEnumWithValues>(),
+            align_of::<Repr<CEnumWithValues>>()
+        );
 
-        let value = EnumC::Unit;
-        let value_repr: Repr<EnumC> = to_repr(&value);
+        let value = CEnumWithValues::Unit;
+        let value_repr: Repr<CEnumWithValues> = to_repr(&value);
         unsafe {
             test_2_equal(&value, &value_repr, &0u8, 0);
         }
 
-        let value = EnumC::Tuple(5);
-        let value_repr: Repr<EnumC> = to_repr(&value);
+        let value = CEnumWithValues::Tuple(5, 15);
+        let value_repr: Repr<CEnumWithValues> = to_repr(&value);
         unsafe {
             let mut off = 0;
             test_2_equal(&value, &value_repr, &1u8, off);
             off += align_of::<u64>();
             test_2_equal(&value, &value_repr, &5u64, off);
+            off += align_of::<u64>();
+            test_2_equal(&value, &value_repr, &15u64, off);
         }
 
-        let value = EnumC::Struct {
+        let value = CEnumWithValues::Struct {
             x: 5,
             y: 0xdeadbeef,
             z: 66,
         };
-        let value_repr: Repr<EnumC> = to_repr(&value);
+        let value_repr: Repr<CEnumWithValues> = to_repr(&value);
         unsafe {
             let mut off = 0;
             test_2_equal(&value, &value_repr, &2u8, off);
@@ -386,9 +535,9 @@ mod test {
     #[test]
     fn test_no_c_enum_with_values() {
         for value in &[
-            EnumNoC::Unit,
-            EnumNoC::Tuple(5),
-            EnumNoC::Struct { x: 1, y: 2, z: 3 },
+            EnumWithValues::Unit,
+            EnumWithValues::Tuple(5, 15),
+            EnumWithValues::Struct { x: 1, y: 2, z: 3 },
         ] {
             test_to_repr_and_back_is_id(*value);
         }
@@ -396,30 +545,38 @@ mod test {
 
     #[test]
     fn test_no_c_enum_repr_layout_matches() {
-        assert_eq!(size_of::<EnumNoC>(), size_of::<Repr<EnumNoC>>());
-        assert_eq!(align_of::<EnumNoC>(), align_of::<Repr<EnumNoC>>());
+        assert_eq!(
+            size_of::<EnumWithValues>(),
+            size_of::<Repr<EnumWithValues>>()
+        );
+        assert_eq!(
+            align_of::<EnumWithValues>(),
+            align_of::<Repr<EnumWithValues>>()
+        );
 
-        let value = EnumNoC::Unit;
-        let value_repr: Repr<EnumNoC> = to_repr(&value);
+        let value = EnumWithValues::Unit;
+        let value_repr: Repr<EnumWithValues> = to_repr(&value);
         unsafe {
             test_2_equal(&value, &value_repr, &0u8, 0);
         }
 
-        let value = EnumNoC::Tuple(5);
-        let value_repr: Repr<EnumNoC> = to_repr(&value);
+        let value = EnumWithValues::Tuple(5, 15);
+        let value_repr: Repr<EnumWithValues> = to_repr(&value);
         unsafe {
             let mut off = 0;
             test_2_equal(&value, &value_repr, &1u8, off);
             off += align_of::<u64>();
             test_2_equal(&value, &value_repr, &5u64, off);
+            off += align_of::<u64>();
+            test_2_equal(&value, &value_repr, &15u64, off);
         }
 
-        let value = EnumNoC::Struct {
+        let value = EnumWithValues::Struct {
             x: 5,
             y: 0xdeadbeef,
             z: 66,
         };
-        let value_repr: Repr<EnumNoC> = to_repr(&value);
+        let value_repr: Repr<EnumWithValues> = to_repr(&value);
         unsafe {
             let mut off = 0;
             test_2_equal(&value, &value_repr, &2u8, off);
@@ -433,18 +590,9 @@ mod test {
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct FooStruct {
-        x: u8,
-        y: u32,
-        z: u64,
-        t: u64,
-    }
-
     #[test]
     fn test_struct_values() {
-        test_to_repr_and_back_is_id(FooStruct {
+        test_to_repr_and_back_is_id(Struct {
             x: 5,
             y: 32,
             z: 67,
@@ -454,13 +602,13 @@ mod test {
 
     #[test]
     fn test_struct_repr_layout_matches() {
-        let value = FooStruct {
+        let value = Struct {
             x: 5,
             y: 32,
             z: 67,
             t: 919,
         };
-        let value_repr: Repr<FooStruct> = to_repr(&value);
+        let value_repr: Repr<Struct> = to_repr(&value);
         unsafe {
             let mut off = 0;
             test_2_equal(&value, &value_repr, &5u8, off);
@@ -473,18 +621,11 @@ mod test {
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, u8)]
-    enum EnumBoolAndArray {
-        Bool(bool),
-        Array([bool; 7]),
-    }
-
     #[test]
     fn test_bool_enum_with_values() {
         for value in &[
-            EnumBoolAndArray::Bool(true),
-            EnumBoolAndArray::Array([true, false, false, false, true, true, true]),
+            EnumWithBoolAndArray::Bool(true),
+            EnumWithBoolAndArray::Array([true, false, false, false, true, true, true]),
         ] {
             test_to_repr_and_back_is_id(*value);
         }
@@ -492,136 +633,84 @@ mod test {
 
     #[test]
     fn test_bool_enum_invalid_values() {
-        let e = EnumBoolAndArray::Bool(true);
-        let mut e_repr: Repr<EnumBoolAndArray> = to_repr(&e);
+        let e = EnumWithBoolAndArray::Bool(true);
+        let mut e_repr: Repr<EnumWithBoolAndArray> = to_repr(&e);
 
-        let repr_ptr = &mut e_repr as *mut Repr<EnumBoolAndArray> as *mut u8;
+        let repr_ptr = &mut e_repr as *mut Repr<EnumWithBoolAndArray> as *mut u8;
         let member_ptr = unsafe { repr_ptr.offset(1) };
         assert_eq!(unsafe { member_ptr.read() }, 1);
         unsafe { core::ptr::write(member_ptr, 3) };
 
-        EnumBoolAndArray::try_from_repr(e_repr).unwrap_err();
+        EnumWithBoolAndArray::try_from_repr(e_repr).unwrap_err();
 
-        let e = EnumBoolAndArray::Array([false, false, false, true, false, false, false]);
-        let mut e_repr: Repr<EnumBoolAndArray> = to_repr(&e);
+        let e = EnumWithBoolAndArray::Array([false, false, false, true, false, false, false]);
+        let mut e_repr: Repr<EnumWithBoolAndArray> = to_repr(&e);
 
-        let repr_ptr = &mut e_repr as *mut Repr<EnumBoolAndArray> as *mut u8;
+        let repr_ptr = &mut e_repr as *mut Repr<EnumWithBoolAndArray> as *mut u8;
         let member_ptr = unsafe { repr_ptr.offset(4) }; // 4th array member
         assert_eq!(unsafe { member_ptr.read() }, 1);
         unsafe { core::ptr::write(member_ptr, 3) };
 
-        EnumBoolAndArray::try_from_repr(e_repr).unwrap_err();
+        EnumWithBoolAndArray::try_from_repr(e_repr).unwrap_err();
     }
 
     #[test]
     fn test_bool_enum_repr_layout_matches() {
         assert_eq!(
-            size_of::<EnumBoolAndArray>(),
-            size_of::<Repr<EnumBoolAndArray>>()
+            size_of::<EnumWithBoolAndArray>(),
+            size_of::<Repr<EnumWithBoolAndArray>>()
         );
         assert_eq!(
-            align_of::<EnumBoolAndArray>(),
-            align_of::<Repr<EnumBoolAndArray>>()
+            align_of::<EnumWithBoolAndArray>(),
+            align_of::<Repr<EnumWithBoolAndArray>>()
         );
 
-        let value = EnumBoolAndArray::Bool(true);
-        let value_repr: Repr<EnumBoolAndArray> = to_repr(&value);
+        let value = EnumWithBoolAndArray::Bool(true);
+        let value_repr: Repr<EnumWithBoolAndArray> = to_repr(&value);
         unsafe {
             test_2_equal(&value, &value_repr, &0u8, 0);
             test_2_equal(&value, &value_repr, &1u8, 1);
         }
 
-        let value = EnumBoolAndArray::Array([true, false, false, false, true, true, true]);
-        let value_repr: Repr<EnumBoolAndArray> = to_repr(&value);
+        let value = EnumWithBoolAndArray::Array([true, false, false, false, true, true, true]);
+        let value_repr: Repr<EnumWithBoolAndArray> = to_repr(&value);
         unsafe {
             test_2_equal(&value, &value_repr, &1u8, 0);
             test_2_equal(&value, &value_repr, &[1u8, 0u8, 0u8, 0u8, 1u8, 1u8, 1u8], 1);
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(u8)]
-    enum Inner {
-        Unit(u8),
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct Outer {
-        x: u8,
-        inner: Inner,
-    }
-
     #[test]
     fn test_nested_repr() {
-        test_to_repr_and_back_is_id(Outer {
+        test_to_repr_and_back_is_id(NestedReprOuter {
             x: 5,
-            inner: Inner::Unit(3),
+            inner: NestedReprInner::Unit(3),
         });
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct WithLifetime<'a> {
-        x: u8,
-        p: PhantomData<&'a u8>,
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, u8)]
-    #[allow(dead_code)]
-    enum NestedLifetime<'a> {
-        One(*const u8, PhantomData<&'a u8>),
-        Two(WithLifetime<'a>),
     }
 
     #[test]
     fn test_repr_with_lifetime_layout_matches() {
         assert_eq!(
-            size_of::<WithLifetime<'static>>(),
-            size_of::<Repr<WithLifetime<'static>>>()
+            size_of::<StructWithLifetime<'static>>(),
+            size_of::<Repr<StructWithLifetime<'static>>>()
         );
         assert_eq!(
-            align_of::<WithLifetime<'static>>(),
-            align_of::<Repr<WithLifetime<'static>>>()
+            align_of::<StructWithLifetime<'static>>(),
+            align_of::<Repr<StructWithLifetime<'static>>>()
         );
     }
-
-    #[derive(IsRepr)]
-    #[repr(C)]
-    struct InnerLifetime<'a>(PhantomData<&'a u8>);
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct OuterLifetime<'a>(*const Repr<InnerLifetime<'a>>);
 
     #[test]
     fn test_nested_lifetime_struct() {
         // Basically test if it's properly generated and nothing more.
-        test_to_repr_and_back_is_id(OuterLifetime(core::ptr::null()));
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, align(16))]
-    struct AlignedU32 {
-        x: u32,
-        y: u32,
-        z: u32,
-        t: u32,
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, align(16))]
-    struct HasAlignedU32 {
-        foo: u32,
-        bar: AlignedU32,
+        test_to_repr_and_back_is_id(NestedLifetimeOuter(core::ptr::null()));
     }
 
     #[test]
     fn test_aligned_struct() {
-        let a = HasAlignedU32 {
+        let a = Aligned16Outer {
             foo: 1,
-            bar: AlignedU32 {
+            bar: Aligned16Inner {
                 x: 2,
                 y: 3,
                 z: 4,
@@ -631,29 +720,11 @@ mod test {
         test_to_repr_and_back_is_id(a);
     }
 
-    // Aligned enum behaves as if it was wrapped in a newtype struct with the specified alignment.
-    // That is, its contents are unaffected by align, only its alignment as a whole.
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(u8, align(4))]
-    #[allow(dead_code)]
-    enum AlignedEnum {
-        Bar,
-        Foo(u8),
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct HasAlignedEnum {
-        foo: u8,
-        bar: AlignedEnum,
-    }
-
     #[test]
     fn test_aligned_enum() {
-        let a = HasAlignedEnum {
+        let a = StructWithAligned4Enum {
             foo: 1,
-            bar: AlignedEnum::Foo(2),
+            bar: Aligned4Enum::Foo(2),
         };
         test_to_repr_and_back_is_id(a);
         let a_repr = to_repr(&a);
@@ -664,26 +735,11 @@ mod test {
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, u8, align(4))]
-    #[allow(dead_code)]
-    enum AlignedCEnum {
-        Bar(u16),
-        Foo(u8),
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C)]
-    struct HasAlignedCEnum {
-        foo: u8,
-        bar: AlignedCEnum,
-    }
-
     #[test]
     fn test_aligned_c_enum() {
-        let a = HasAlignedCEnum {
+        let a = StructWithCAligned4Enum {
             foo: 1,
-            bar: AlignedCEnum::Foo(2),
+            bar: CAligned4Enum::Foo(2),
         };
         test_to_repr_and_back_is_id(a);
         let a_repr = to_repr(&a);
@@ -692,16 +748,6 @@ mod test {
             test_2_equal(&a, &a_repr, &1u8, 4); // Aligned enum start, tag
             test_2_equal(&a, &a_repr, &2u8, 6); // Inner union start, alignment 2
         }
-    }
-
-    // Packed enums are disallowed in Rust.
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, packed)]
-    struct Packed {
-        foo: u8,
-        bar: u32,
-        baz: u64,
     }
 
     #[test]
@@ -724,14 +770,6 @@ mod test {
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(C, packed(2))]
-    struct Packed2 {
-        foo: u8,
-        bar: u32,
-        baz: u64,
-    }
-
     #[test]
     fn test_packed2() {
         let a = Packed2 {
@@ -752,18 +790,6 @@ mod test {
         }
     }
 
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(transparent)]
-    enum TransparentEnum {
-        FOO(u32, (), ()),
-    }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(transparent)]
-    enum EmptyTransparentEnum {
-        FOO,
-    }
-
     #[test]
     fn test_transparent_enum() {
         let a = TransparentEnum::FOO(4, (), ());
@@ -778,14 +804,6 @@ mod test {
         assert_eq!(align_of::<EmptyTransparentEnum>(), 1);
         test_to_repr_and_back_is_id(a);
     }
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(transparent)]
-    struct TransparentStruct(u32, (), ());
-
-    #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-    #[repr(transparent)]
-    struct EmptyTransparentStruct;
 
     #[test]
     fn test_transparent_struct() {
