@@ -182,11 +182,11 @@ pub(crate) mod traits;
 ///
 /// ## Limitations
 ///
-/// * `#[derive(IsRepr)]` should be placed above all `#[repr(C)]`-like attributes, otherwise it's not
-///   guaranteed to process them.
-/// * Parametrized types with parameters that are not lifetimes are not supported.
-/// * [`repr(transparent)`] is not supported. You can pretty easily derive [`IsRepr`] manually in
-///   this situation.
+/// * `#[derive(IsRepr)]` should be placed above all `#[repr(C)]`-like attributes. There's no
+///   specification on the order of processing attibute macros, but apparrently it is done top
+///   down.
+/// * Automatic derivation for parametrized types with parameters that are not lifetimes is not
+///   supported.
 ///
 pub use repr_macros::IsRepr;
 
