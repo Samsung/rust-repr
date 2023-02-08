@@ -292,7 +292,7 @@ impl<'a> GeneratedEnum<'a> {
                 match #get_tag {
                     #(
                         #tag_literals => {
-                            let #variant_var = unsafe { #repr_var.u.#variant_field_names };
+                            let #variant_var = unsafe { &#repr_var.u.#variant_field_names };
                             #variant_members_are_repr_check
                             Ok(())
                         },
