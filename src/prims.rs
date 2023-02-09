@@ -30,15 +30,16 @@ trivial!(i128);
 trivial!(isize);
 trivial!(f32);
 trivial!(f64);
+trivial!(char);
 
-unsafe impl<T> HasRepr for *const T {
+unsafe impl<T: ?Sized> HasRepr for *const T {
     type Raw = Self;
     fn raw_is_valid(_: &*const T) -> Result<(), ReprError> {
         Ok(())
     }
 }
 
-unsafe impl<T> HasRepr for *mut T {
+unsafe impl<T: ?Sized> HasRepr for *mut T {
     type Raw = Self;
     fn raw_is_valid(_: &*mut T) -> Result<(), ReprError> {
         Ok(())
@@ -46,7 +47,7 @@ unsafe impl<T> HasRepr for *mut T {
 }
 
 //PhantomData. Strip type info so we don't have to worry about lifetimes.
-unsafe impl<T> HasRepr for PhantomData<T> {
+unsafe impl<T: ?Sized> HasRepr for PhantomData<T> {
     type Raw = ();
     fn raw_is_valid(_: &()) -> Result<(), ReprError> {
         Ok(())

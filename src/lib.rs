@@ -811,4 +811,12 @@ mod test {
         // Test if it's properly generated and nothing more.
         let _ = NestedLifetimeOuter(std::ptr::null());
     }
+
+    #[derive(IsRepr)]
+    #[repr(C)]
+    struct UnsizedPhantomData(PhantomData<[u8]>);
+
+    #[derive(IsRepr)]
+    #[repr(C)]
+    struct UnsizedPtr(*mut [u8]);
 }
