@@ -1,9 +1,9 @@
-use std::fmt::Display;
 use self::repr_enum::repr_impl_for_enum;
 use self::repr_struct::repr_impl_for_struct;
 use self::repr_type::get_repr_type;
 use self::repr_util::def_has_non_lifetime_generics;
 use proc_macro2::TokenStream;
+use std::fmt::Display;
 use syn::spanned::Spanned;
 
 pub(crate) mod repr_enum;
