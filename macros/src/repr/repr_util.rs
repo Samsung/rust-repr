@@ -13,7 +13,7 @@ impl<'a> ToTokens for Quote<'a> {
     }
 }
 // Crate name constant for less repetition.
-pub const CRATE: Quote = Quote("::repr");
+pub const CRATE: Quote = Quote("::isrepr");
 
 pub fn def_has_non_lifetime_generics(def: &DeriveInput) -> bool {
     def.generics

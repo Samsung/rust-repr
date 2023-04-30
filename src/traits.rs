@@ -71,7 +71,7 @@ pub unsafe trait HasRepr: Sized {
 /// underlying type. This trait allows code like this:
 ///
 /// ```
-/// use repr::{IsRepr, RawTryInto};
+/// use isrepr::{IsRepr, RawTryInto};
 ///
 /// #[derive(IsRepr, Clone, Copy)]
 /// #[repr(u8)]
@@ -105,7 +105,7 @@ impl<T: HasRepr> RawTryInto<T> for T::Raw {
 ///
 /// For example, this does not compile:
 /// ```compile_fail
-/// use repr::{IsRepr, Repr};
+/// use isrepr::{IsRepr, Repr};
 /// use core::mem::transmute;
 ///
 /// #[derive(IsRepr, Clone, Copy)]

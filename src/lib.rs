@@ -21,7 +21,7 @@
 //!
 //! For example, a representation can be derived and used as follows:
 //! ```
-//! use repr::{IsRepr, Repr, ReprError};
+//! use isrepr::{IsRepr, Repr, ReprError};
 //! use core::convert::TryInto;
 //! use core::mem::transmute;
 //!
@@ -63,7 +63,7 @@ pub(crate) mod traits;
 ///
 /// [`HasRepr`] can be derived for fieldless enums if all values are explicitly specified:
 /// ```
-/// use repr::IsRepr;
+/// use isrepr::IsRepr;
 ///
 /// #[derive(IsRepr, Clone, Copy, Debug)]
 /// #[repr(u8)]
@@ -75,7 +75,7 @@ pub(crate) mod traits;
 ///
 /// Fieldless enums can be converted directly from their underlying types:
 /// ```
-/// use repr::{HasRepr, IsRepr, Repr, RawTryInto};
+/// use isrepr::{HasRepr, IsRepr, Repr, RawTryInto};
 /// use core::mem::transmute;
 ///
 /// #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,7 +96,7 @@ pub(crate) mod traits;
 ///
 /// ```
 /// mod my_crate {
-///     use repr::IsRepr;
+///     use isrepr::IsRepr;
 ///
 ///     #[derive(IsRepr, Clone, Copy, Debug)]
 ///     #[repr(u8)]
@@ -118,7 +118,7 @@ pub(crate) mod traits;
 ///
 /// ```
 /// mod my_crate {
-///     use repr::IsRepr;
+///     use isrepr::IsRepr;
 ///
 ///     #[derive(IsRepr, Clone, Copy, Debug)]
 ///     #[repr(u8)]
@@ -139,7 +139,7 @@ pub(crate) mod traits;
 /// [`HasRepr`] types can be converted by reference:
 ///
 /// ```
-/// use repr::{HasRepr, IsRepr, Repr};
+/// use isrepr::{HasRepr, IsRepr, Repr};
 /// use core::mem::transmute;
 /// #[derive(IsRepr, Clone, Copy, Debug)]
 /// #[repr(u8)]
@@ -163,7 +163,7 @@ pub(crate) mod traits;
 /// lifetimes by casting to representation and back will not compile:
 ///
 /// ```compile_fail
-/// use repr::{HasRepr, IsRepr, Repr};
+/// use isrepr::{HasRepr, IsRepr, Repr};
 /// use core::marker::PhantomData;
 ///
 /// #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
@@ -188,13 +188,13 @@ pub(crate) mod traits;
 /// * Automatic derivation for parametrized types with parameters that are not lifetimes is not
 ///   supported.
 ///
-pub use repr_macros::IsRepr;
+pub use isrepr_macros::IsRepr;
 
 pub use traits::{HasRepr, RawTryInto, Repr, ReprError};
 
 // Needed for macros work in tests.
 #[cfg(test)]
-extern crate self as repr;
+extern crate self as isrepr;
 
 #[cfg(test)]
 mod test {

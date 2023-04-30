@@ -1,6 +1,6 @@
 [package]
-name = "repr_macros"
-description = "Proc-macro crate for 'repr' crate"
+name = "isrepr_macros"
+description = "Proc-macro crate for 'isrepr' crate"
 homepage = "https://github.com/Samsung/rust-repr"
 repository = "https://github.com/Samsung/rust-repr"
 version = "0.0.1"
