@@ -252,7 +252,6 @@ mod test {
         // not 100% perfect as it doesn't guarantee that padding doesn't have the same value.
 
         struct GlobalLayoutInfo {
-            tested_ptr: *const u8,
             verified_offsets: Vec<u8>,
         }
 
@@ -260,17 +259,8 @@ mod test {
 
         static OFFSET_CHECK_LOCK: Mutex<()> = Mutex::new(());
         static LAYOUT_INFO: Mutex<GlobalLayoutInfo> = Mutex::new(GlobalLayoutInfo {
-            tested_ptr: std::ptr::null(),
             verified_offsets: Vec::new(),
         });
-
-        fn set_tested_ptr(p: *const u8) {
-            LAYOUT_INFO.lock().unwrap().tested_ptr = p;
-        }
-
-        fn tested_ptr() -> *const u8 {
-            LAYOUT_INFO.lock().unwrap().tested_ptr
-        }
 
         fn add_verified_offset(off: u8) {
             LAYOUT_INFO.lock().unwrap().verified_offsets.push(off);
@@ -289,6 +279,7 @@ mod test {
             assert_eq!(expected_set, actual_set);
         }
 
+        // Dirty shortcut: T should be valid for any memory contents.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[repr(C)]
         struct L<T: Sized + Copy + Eq + std::fmt::Debug + Default, const OFFSET: usize, const CHECK_ID: u8>(
@@ -352,8 +343,6 @@ mod test {
             let p = std::panic::catch_unwind(|| {
                 // Take care to use the same reference for saving pointer and converting
                 clear_verified_offsets();
-                set_tested_ptr(&t_repr_ref as *const _ as *const u8);
-                assert_eq!(tested_ptr(), &t_repr_ref as *const _ as *const u8);
                 let _new_t = t_repr_ref.ref_try_into().unwrap();
                 compare_verified_offsets(expected_offsets);
             });
@@ -371,7 +360,7 @@ mod test {
             off: usize,
         ) {
             let mut e = to_repr(e);
-            unsafe { raw_write(&mut e, m, off) };
+            raw_write(&mut e, m, off);
             e.repr_try_into().unwrap_err();
         }
 
