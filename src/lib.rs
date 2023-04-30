@@ -242,21 +242,63 @@ mod test {
         //
         // In a type, we encode its expected layout, like so:
         // struct Foo {
-        //     x: L64<0>,
-        //     y: L64<8>,
+        //     x: L<0, 0>,
+        //     y: L<8, 1>,
         // }
         //
-        // The L64<N> types have a custom implementation of HasRepr that verifies that they have the
-        // right offset relative to the type being checked. In order to check that offset, we set
-        // each L to a unique bit pattern, which then gets verified inside the type. FIXME: This is
-        // not 100% perfect as it doesn't guarantee that padding doesn't have the same value.
+        // The L<N, ID> types have a custom implementation of HasRepr that verifies that they have
+        // the right offset relative to the type being checked. In order to check that offset, we
+        // set each L to a unique bit pattern, which then gets verified inside the type. FIXME:
+        // This is not 100% perfect as it doesn't guarantee that padding doesn't have the same
+        // value.
 
+        // The type comes first. Dirty shortcut: T should be valid for any memory contents.
+        trait Num: Sized + Copy + Eq + std::fmt::Debug + Default {}
+        impl<T: Sized + Copy + Eq + std::fmt::Debug + Default> Num for T {}
+
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[repr(C)]
+        struct L<T: Num, const OFF: usize, const ID: u8>(T);
+
+        impl<T: Num, const OFF: usize, const ID: u8> L<T, OFF, ID> {
+            fn unique_byte_pattern() -> Vec<u8> {
+                alloc::vec![0xffu8 - ID; size_of::<Self>()]
+            }
+
+            fn new() -> Self {
+                let mut me = Self(Default::default());
+                let mep = &mut me as *mut _ as *mut u8;
+                let unique_byte_pattern = Self::unique_byte_pattern();
+                unsafe {
+                    mep.copy_from(unique_byte_pattern.as_ptr(), size_of::<Self>());
+                }
+                me
+            }
+        }
+
+        unsafe impl<T: Num, const OFF: usize, const ID: u8> HasRepr for L<T, OFF, ID> {
+            type Raw = Self;
+
+            fn raw_is_valid(value: &Self::Raw) -> Result<(), ReprError> {
+                let unique_byte_pattern = Self::unique_byte_pattern();
+                let current_byte_pattern = unsafe {
+                    std::slice::from_raw_parts(value as *const _ as *const u8, size_of::<Self>())
+                };
+                assert_eq!(&unique_byte_pattern, current_byte_pattern);
+                add_verified_offset(ID);
+                Ok(())
+            }
+        }
+
+        // Now, something to verify we checked all members and exactly the members we want. Can't
+        // pass arguments to IsRepr, so we access a global in HasRepr implementation.
         struct GlobalLayoutInfo {
             verified_offsets: Vec<u8>,
         }
-
         unsafe impl Send for GlobalLayoutInfo {}
 
+        // Hack: use a separate mutex, since HasRepr implementation is called from a different
+        // context.
         static OFFSET_CHECK_LOCK: Mutex<()> = Mutex::new(());
         static LAYOUT_INFO: Mutex<GlobalLayoutInfo> = Mutex::new(GlobalLayoutInfo {
             verified_offsets: Vec::new(),
@@ -279,55 +321,6 @@ mod test {
             assert_eq!(expected_set, actual_set);
         }
 
-        // Dirty shortcut: T should be valid for any memory contents.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[repr(C)]
-        struct L<T: Sized + Copy + Eq + std::fmt::Debug + Default, const OFFSET: usize, const CHECK_ID: u8>(
-            T,
-        );
-
-        impl<
-                T: Sized + Copy + Eq + std::fmt::Debug + Default,
-                const OFFSET: usize,
-                const CHECK_ID: u8,
-            > L<T, OFFSET, CHECK_ID>
-        {
-            fn unique_byte_pattern() -> Vec<u8> {
-                let mut v = Vec::new();
-                v.resize(size_of::<Self>(), 0xffu8 - CHECK_ID);
-                v
-            }
-
-            fn new() -> Self {
-                let mut me = Self(Default::default());
-                let mep = &mut me as *mut _ as *mut u8;
-                let unique_byte_pattern = Self::unique_byte_pattern();
-                unsafe {
-                    mep.copy_from(unique_byte_pattern.as_ptr(), size_of::<Self>());
-                }
-                me
-            }
-        }
-
-        unsafe impl<
-                T: Sized + Copy + Eq + std::fmt::Debug + Default,
-                const OFFSET: usize,
-                const CHECK_ID: u8,
-            > HasRepr for L<T, OFFSET, CHECK_ID>
-        {
-            type Raw = Self;
-
-            fn raw_is_valid(value: &Self::Raw) -> Result<(), ReprError> {
-                let unique_byte_pattern = Self::unique_byte_pattern();
-                let current_byte_pattern = unsafe {
-                    std::slice::from_raw_parts(value as *const _ as *const u8, size_of::<Self>())
-                };
-                assert_eq!(&unique_byte_pattern, current_byte_pattern);
-                add_verified_offset(CHECK_ID);
-                Ok(())
-            }
-        }
-
         fn test_layout<T: HasRepr>(t: &T, expected_offsets: &[u8])
         where
             T::Raw: RefUnwindSafe,
@@ -341,7 +334,6 @@ mod test {
 
             // Unlock the global lock on panic
             let p = std::panic::catch_unwind(|| {
-                // Take care to use the same reference for saving pointer and converting
                 clear_verified_offsets();
                 let _new_t = t_repr_ref.ref_try_into().unwrap();
                 compare_verified_offsets(expected_offsets);
