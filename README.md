@@ -34,7 +34,7 @@ especially for enums.
 This crate does the boilerplate for you, like so:
 
 ```rust
-use repr::{IsRepr, Repr, ReprError};
+use isrepr::{IsRepr, Repr, ReprError};
 use core::convert::TryInto;
 use core::mem::transmute;
 
