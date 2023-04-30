@@ -1,7 +1,7 @@
 [package]
 name = "repr_macros"
 version = "0.0.1"
-authors = ["Camellia contributors"]
+authors = ["Igor Kotrasiński <i.kotrasinsk@samsung.com>"]
 edition = "2021"
 
 [lib]
