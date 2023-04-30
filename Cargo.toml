@@ -1,10 +1,17 @@
 [package]
 name = "repr"
+description = "Proc-macro crate for generating validation from arbitrary memory to repr(C) types"
+readme = "README.md"
+homepage = "https://github.com/Samsung/rust-repr"
+repository = "https://github.com/Samsung/rust-repr"
 version = "0.1.0"
 edition = "2021"
+keywords = ["repr", "validation", "memory"]
+categories = ["no-std", "no-std::no-alloc", "rust-patterns"]
 authors = ["Igor Kotrasiński <i.kotrasinsk@samsung.com>"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-repr_macros = { path = "./macros" }
+repr_macros = { path = "./macros", version = "*" }
