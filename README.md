@@ -27,7 +27,7 @@ to such memory to a reference, since [this can lead to undefined
 behaviour](https://doc.rust-lang.org/reference/behavior-considered-undefined.html).
 
 Fortunately, the layout for properly defined `#[repr(C)]` types is
-[well-defined](https://doc.rust-lang.org/reference/behavior-considered-undefined.html).
+[well-defined](https://doc.rust-lang.org/reference/type-layout.html).
 Unfortunately, working with this layout involves writing a lot of boilerplate,
 especially for enums.
 
