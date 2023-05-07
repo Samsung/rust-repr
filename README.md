@@ -63,9 +63,4 @@ fn main() {
 Links
 =====
 
-* Documentation: TODO.
-
-TODO
-====
-
-* Publish on crates.io.
+* [Docs.rs documentation](https://docs.rs/isrepr)
