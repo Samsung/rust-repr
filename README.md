@@ -39,6 +39,7 @@ use core::convert::TryInto;
 use core::mem::transmute;
 
 #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(C)]
 enum Foo {
     FOO(u16, u32),
     BAR,
