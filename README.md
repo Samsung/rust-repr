@@ -6,7 +6,7 @@ Intro
 Imagine you have an enum type, like so:
 
 ```rust
-#[repr(C)]
+#[repr(u8)]
 enum Foo {
     FOO(u16, u32),
     BAR,
@@ -39,7 +39,7 @@ use core::convert::TryInto;
 use core::mem::transmute;
 
 #[derive(IsRepr, Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(C)]
+#[repr(u8)]
 enum Foo {
     FOO(u16, u32),
     BAR,
